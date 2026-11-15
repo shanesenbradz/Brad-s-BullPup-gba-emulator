@@ -11,7 +11,9 @@ No games are included. Load ROMs you dumped from cartridges you own.
 
 ## Install
 
-Grab the APK from the [latest release](../../releases/latest), open it on your phone and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
+Download [Brads_Bullpup_1.3.apk](release/Brads_Bullpup_1.3.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
+
+There's also [Brads_Bullpup_1.3.html](release/Brads_Bullpup_1.3.html?raw=1), the same app as one file you can open in Chrome on a phone or PC.
 
 It runs on Android 7 and up. New versions install over old ones and keep your games, saves and states, as long as they're signed with the same key.
 
@@ -43,6 +45,7 @@ android/      manifest, icons and MainActivity.java for the WebView shell
 tools/        bundle.py and build_apk.sh
 test/         a homebrew test ROM, its C source, and a Playwright end-to-end test
 dist/         the bundled single-file app
+release/      signed APKs and HTML builds, one per version
 ```
 
 The core is the single-threaded mGBA build from the wasm-gaming project, so it doesn't need SharedArrayBuffer or special server headers. That is what lets it run from a plain file or inside a WebView.
