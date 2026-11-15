@@ -25,7 +25,7 @@ const DEFAULTS = {
   // look
   theme: 'graphite', accent: 'brass', grid: 'regular', motion: 'full', skin: 'gunmetal', texture: 'auto', btnStyle: 'console', press: 'subtle', labels: true,
   click: 'off', clickVol: 1, haptic: 'light', ambient: 'subtle', bezel: false, glass: false, led: true,
-  shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0,
+  shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0, vinyl: 'soft', saveLights: false,
   // system
   autoResume: true, autoSaveSec: 30, pauseOnMenu: true, pauseHidden: true, skipBios: true, idle: 'remove', opposing: false, wakeLock: true, slot: 1,
 };
@@ -156,7 +156,9 @@ const Touch = {
     }
     this.measure();
     this.syncToggles();
+    refreshVinyl();
   },
+  setOpacity() { const L = this.layout(); for (const k in this.els) this.els[k].style.opacity = (L[k]?.o ?? 1) * S.ctlOpacity; },
   measure() { this.rects = {}; for (const k in this.els) { const r = this.els[k].getBoundingClientRect(); this.rects[k] = { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; } },
   syncToggles() { this.els.ff?.classList.toggle('on', Emu.ffToggle); this.els.ta?.classList.toggle('on', !!(Input.turboLatch & 1)); this.els.tb?.classList.toggle('on', !!(Input.turboLatch & 2)); },
   hit(x, y) {
@@ -256,7 +258,7 @@ const Touch = {
     c.x = clamp((e.clientX - ox) / r.width * 100, 0, 100); c.y = clamp((e.clientY - oy) / r.height * 100, 0, 100);
     const el = this.els[this.sel]; el.style.left = c.x + '%'; el.style.top = c.y + '%';
   },
-  editUp() { this.drag = null; },
+  editUp() { this.drag = null; refreshVinyl(); },
   selUpdate() {
     const k = this.sel, L = this.layout();
     $('#ebName').textContent = k ? `${(CTL_DEFS[k].label || 'D-pad')}  (${this.orient})` : `Drag controls to move them (${this.orient})`;

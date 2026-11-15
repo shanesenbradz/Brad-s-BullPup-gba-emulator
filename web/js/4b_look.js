@@ -29,11 +29,12 @@ const SKINS = {
 function applyLook() {
   const r = document.documentElement, d = r.dataset;
   d.theme = S.theme; d.btn = S.btnStyle; d.press = S.press; d.labels = S.labels ? 'on' : 'off';
-  d.amb = S.ambient; d.shell = S.shell ? 'on' : 'off'; d.gloss = S.gloss; d.grille = S.grille ? 'on' : 'off'; d.wall = S.wall && _wallUrl ? 'on' : 'off'; d.bezel = S.bezel ? 'on' : 'off'; d.glass = S.glass ? 'on' : 'off'; d.led = S.led ? 'on' : 'off'; d.motion = S.motion;
+  d.amb = S.ambient; d.shell = S.shell ? 'on' : 'off'; d.gloss = S.gloss; d.grille = S.grille ? 'on' : 'off'; d.wall = S.wall && _wallUrl ? 'on' : 'off'; d.bezel = S.bezel ? 'on' : 'off'; d.glass = S.glass ? 'on' : 'off'; d.led = S.led ? 'on' : 'off'; d.motion = S.motion; d.vinyl = S.vinyl !== 'off' ? 'on' : 'off';
   const sk = SKINS[S.skin] || SKINS.gunmetal;
   d.tex = S.texture === 'auto' ? (d.wall === 'on' ? 'matte' : sk.clear ? 'pcb' : 'matte') : S.texture;
   r.style.setProperty('--armory', armoryTile());
   const wall = document.getElementById('wall'); if (wall) wall.style.filter = `blur(${S.wallBlur}px) brightness(${(1 - S.wallDim).toFixed(2)})`;
+  const vc = document.getElementById('vinyl'); if (vc) vc.style.filter = `brightness(${(1 - S.wallDim).toFixed(2)})`;
   const dec = document.getElementById('decal'); if (dec) { dec.innerHTML = SPRITES[S.decal] || ''; dec.classList.toggle('show', !!SPRITES[S.decal]); }
   SKIN_KEYS.forEach((k, i) => r.style.setProperty('--' + k, sk.v[i]));
   if (d.wall === 'on') r.style.setProperty('--well', 'rgba(0,0,0,.34)');
@@ -41,7 +42,8 @@ function applyLook() {
   r.style.setProperty('--acc', a[0]); r.style.setProperty('--acc-ink', a[1]); r.style.setProperty('--acc-text', S.theme === 'light' ? a[3] : a[2]);
   r.style.setProperty('--cover-min', { compact: '112px', regular: '148px', large: '208px' }[S.grid] || '148px');
   const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.content = S.theme === 'light' ? '#f2f2f7' : S.theme === 'oled' ? '#000000' : '#111113';
-  if (typeof Emu !== 'undefined' && Emu.active) { Emu.layoutScreen(); Emu.updateLed(); }
+  if (typeof Emu !== 'undefined' && Emu.active) { Emu.layoutScreen(); Emu.updateLed(); Emu.saveLeds(); }
+  refreshVinyl();
 }
 
 /* ---- tactile feedback: haptics + synthesized click ---- */
@@ -94,7 +96,7 @@ function spriteFor(seed) { const keys = ['pistol', 'revolver', 'raygun', 'soaker
 
 /* ---- custom wallpaper on the device body ---- */
 let _wallUrl = null;
-function applyWall(u) { _wallUrl = u || null; const w = document.getElementById('wall'); if (w) w.style.backgroundImage = u ? `url(${u})` : ''; document.documentElement.style.setProperty('--wall-url', u ? `url(${u})` : 'none'); }
+function applyWall(u) { _wallUrl = u || null; _wallVer++; const w = document.getElementById('wall'); if (w) w.style.backgroundImage = u ? `url(${u})` : ''; document.documentElement.style.setProperty('--wall-url', u ? `url(${u})` : 'none'); }
 async function loadWallpaper() { try { applyWall(await DB.get('kv', 'wallpaper')); } catch (e) {} applyLook(); }
 async function setWallpaperFromFile(f) {
   const bmp = await createImageBitmap(f);
@@ -105,3 +107,141 @@ async function setWallpaperFromFile(f) {
   await DB.put('kv', 'wallpaper', url); S.wall = true; saveSettings(); applyWall(url); applyLook();
 }
 async function clearWallpaper() { await DB.del('kv', 'wallpaper'); S.wall = false; saveSettings(); applyWall(null); applyLook(); }
+
+/* ---- vinyl wrap: the wallpaper as a printed skin that rolls over the body edges and dips into the button wells ----
+   Everything is baked once into a canvas (per layout), so it costs nothing while a game runs. */
+let _pv = null, _wallImg = null, _wallImgUrl = null, _wallVer = 0, _vinylKey = '', _vinylT = 0;
+async function wallImage() {
+  if (!_wallUrl) return null;
+  if (_wallImg && _wallImgUrl === _wallUrl) return _wallImg;
+  const im = new Image(); im.src = _wallUrl; await im.decode();
+  _wallImg = im; _wallImgUrl = _wallUrl; return im;
+}
+const vinylOn = () => document.documentElement.dataset.wall === 'on' && S.vinyl !== 'off';
+// molded wells under the controls, as rounded boxes in host-relative CSS px
+function wellShapes(host, ctls) {
+  if (S.btnStyle !== 'console') return [];
+  const hr = host.getBoundingClientRect(), out = [];
+  for (const e of ctls) {
+    if (!e.isConnected || e.classList.contains('ghost')) continue;
+    const r = e.getBoundingClientRect(); if (!r.width) continue;
+    const cx = r.left + r.width / 2 - hr.left, cy = r.top + r.height / 2 - hr.top, w = r.width, h = r.height;
+    let boxes;
+    if (e.dataset.k === 'dpad') boxes = [[w * 0.52, w * 0.205, w * 0.07], [w * 0.205, w * 0.52, w * 0.07]];
+    else if (e.classList.contains('pill')) boxes = [[w / 2 + 5, h / 2 + 5, h / 2 + 5]];
+    else boxes = [[w / 2 + 7, h / 2 + 7, Math.min(w, h) / 2 + 7]];
+    const R = Math.max(...boxes.map(b => Math.max(b[0], b[1])));
+    out.push({ cx, cy, R, boxes });
+  }
+  return out;
+}
+function sdWell(wl, x, y) {
+  let d = Infinity; const px = Math.abs(x - wl.cx), py = Math.abs(y - wl.cy);
+  for (const [hx, hy, r] of wl.boxes) {
+    const qx = px - (hx - r), qy = py - (hy - r);
+    const o = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+    if (o < d) d = o;
+  }
+  return d;
+}
+// 1D edge roll: screen position -> position on the flat sheet, plus how far the surface has turned away (0..1)
+function rollAxis(n, scale, len, r0, r1, offset) {
+  const S_ = new Float32Array(n), N = new Float32Array(n), A = Math.PI / 2;
+  for (let i = 0; i < n; i++) {
+    const x = (i + 0.5) / scale - offset;
+    let s, t = 0;
+    if (x < r0) { t = Math.min(1, (r0 - Math.max(x, 0)) / r0); s = r0 * A - r0 * Math.asin(t); t = -t; }
+    else if (x > len - r1) { t = Math.min(1, (x - (len - r1)) / r1); s = r0 * A + (len - r0 - r1) + r1 * Math.asin(t); }
+    else s = r0 * A + (x - r0);
+    S_[i] = s; N[i] = t;
+  }
+  return { S: S_, N, total: (len - r0 - r1) + (r0 + r1) * A };
+}
+async function renderVinyl(cv, W, H, wells, topY = 0) {
+  const img = await wallImage(); if (!img || W < 20 || H < 20) return;
+  const k = S.vinyl === 'deep' ? 1.8 : 1;
+  const sc = Math.min(Math.min(devicePixelRatio || 1, 1.6), 1400 / Math.max(W, H));
+  const w = Math.round(W * sc), h = Math.round(H * sc);
+  const Hv = Math.max(40, H - topY);
+  const rx = Math.min(W * 0.07 * k, 64), rb = Math.min(Hv * 0.045 * k, 56), rt = Math.min(16 * k, 32);
+  const cols = rollAxis(w, sc, W, rx, rx, 0), rows = rollAxis(h, sc, Hv, rt, rb, topY);
+  // the flat sheet, cover-fitted, with the wallpaper blur baked in
+  const sw = Math.max(1, Math.round(cols.total * sc)), sh = Math.max(1, Math.round(rows.total * sc));
+  const src = document.createElement('canvas'); src.width = sw; src.height = sh;
+  const g = src.getContext('2d', { willReadFrequently: true });
+  const f = Math.max(sw / img.width, sh / img.height), dw = img.width * f, dh = img.height * f;
+  const bl = S.wallBlur * sc; if (bl) g.filter = `blur(${bl}px)`;
+  g.drawImage(img, (sw - dw) / 2 - bl * 2, (sh - dh) / 2 - bl * 2, dw + bl * 4, dh + bl * 4);
+  const sd = g.getImageData(0, 0, sw, sh).data;
+  const out = new ImageData(w, h), od = out.data;
+  // light from the upper left, a little in front
+  let Lx = -0.34, Ly = -0.52, Lz = 0.78; { const m = Math.hypot(Lx, Ly, Lz); Lx /= m; Ly /= m; Lz /= m; }
+  let Hx = Lx, Hy = Ly, Hz = Lz + 1; { const m = Math.hypot(Hx, Hy, Hz); Hx /= m; Hy /= m; Hz /= m; }
+  const ks = { matte: 0.08, satin: 0.22, gloss: 0.42 }[S.gloss] ?? 0.22, shin = S.gloss === 'gloss' ? 70 : 34;
+  const specFlat = Math.pow(Hz, shin);
+  const B = 12 * k, D = 4 * k; // band the vinyl stretches over around a well, and how far it gets pulled in
+  let seed = 1234567;
+  for (let j = 0; j < h; j++) {
+    const py = (j + 0.5) / sc, syRow = rows.S[j], nyRoll = rows.N[j], tiltY = 0.07 * ((py - topY) / Hv * 2 - 1);
+    const near = wells.filter(wl => Math.abs(py - wl.cy) < wl.R + B + 2);
+    for (let i = 0; i < w; i++) {
+      const px = (i + 0.5) / sc, nxRoll = cols.N[i];
+      let sx = cols.S[i], sy = syRow, nx = nxRoll + 0.1 * (px / W * 2 - 1), ny = nyRoll + tiltY, mul = 1;
+      // only the closest well bends the vinyl, so neighbouring wells don't stack into ripples
+      let wl = null, d = B;
+      for (const c of near) { if (Math.abs(px - c.cx) > c.R + B + 2) continue; const dc = sdWell(c, px, py); if (dc < d) { d = dc; wl = c; } }
+      if (wl) {
+        const gx = sdWell(wl, px + 0.6, py) - sdWell(wl, px - 0.6, py), gy = sdWell(wl, px, py + 0.6) - sdWell(wl, px, py - 0.6);
+        const gm = Math.hypot(gx, gy) || 1, ux = gx / gm, uy = gy / gm;
+        let pull, slope;
+        if (d > 0) { const t = 1 - d / B, s = t * t * (3 - 2 * t); pull = D * s; slope = 0.9 * Math.sin(t * Math.PI / 2) * s; }
+        else { pull = D + Math.min(-d, 12) * 0.25; slope = 0; mul *= 0.8; }
+        sx += ux * pull; sy += uy * pull; nx -= ux * slope; ny -= uy * slope;
+      }
+      // shading from the bent surface
+      const nz = Math.sqrt(Math.max(0.04, 1 - nx * nx - ny * ny)), m = Math.hypot(nx, ny, nz);
+      const ex = nx / m, ey = ny / m, ez = nz / m;
+      const diff = ex * Lx + ey * Ly + ez * Lz;
+      const edge = Math.sqrt(Math.max(0, 1 - nxRoll * nxRoll)) * Math.sqrt(Math.max(0, 1 - nyRoll * nyRoll));
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      const peel = 1 + ((seed >> 16) / 32768 - 0.5) * 0.035;
+      const shade = Math.max(0.2, (1 + 0.95 * (diff - Lz)) * (0.55 + 0.45 * edge) * mul * peel);
+      const nh = Math.max(0, ex * Hx + ey * Hy + ez * Hz);
+      const spec = 255 * ks * Math.max(0, Math.pow(nh, shin) - specFlat);
+      // bilinear sample of the flat sheet
+      let fx = sx * sc - 0.5, fy = sy * sc - 0.5;
+      fx = fx < 0 ? 0 : fx > sw - 1.001 ? sw - 1.001 : fx; fy = fy < 0 ? 0 : fy > sh - 1.001 ? sh - 1.001 : fy;
+      const x0 = fx | 0, y0 = fy | 0, ax = fx - x0, ay = fy - y0, x1 = Math.min(x0 + 1, sw - 1), y1 = Math.min(y0 + 1, sh - 1);
+      const a = (y0 * sw + x0) * 4, b = (y0 * sw + x1) * 4, c = (y1 * sw + x0) * 4, e = (y1 * sw + x1) * 4, o = (j * w + i) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        const v = (sd[a + ch] * (1 - ax) + sd[b + ch] * ax) * (1 - ay) + (sd[c + ch] * (1 - ax) + sd[e + ch] * ax) * ay;
+        od[o + ch] = v * shade + spec;
+      }
+      od[o + 3] = 255;
+    }
+  }
+  cv.width = w; cv.height = h; cv.getContext('2d').putImageData(out, 0, 0);
+}
+// the in-game body: re-bake when the wallpaper, layout or finish changes
+function refreshVinyl(now) {
+  clearTimeout(_vinylT);
+  if (!now) { _vinylT = setTimeout(() => refreshVinyl(true), 120); return; }
+  if (_pv?.isConnected) refreshPreviewVinyl(_pv);
+  const body = document.getElementById('body'), cv = document.getElementById('vinyl');
+  if (!body || !cv || !vinylOn() || !body.classList.contains('show') || typeof Touch === 'undefined') return;
+  const br = body.getBoundingClientRect(), st = document.getElementById('stage').getBoundingClientRect();
+  const topY = Math.max(0, Math.min(br.height * 0.8, st.bottom - br.top));
+  const wells = wellShapes(body, Object.values(Touch.els));
+  const key = [_wallVer, br.width, br.height, topY, S.vinyl, S.gloss, S.wallBlur, S.btnStyle, devicePixelRatio, JSON.stringify(wells.map(w => [w.cx | 0, w.cy | 0, w.R | 0]))].join('|');
+  if (key === _vinylKey) return;
+  _vinylKey = key;
+  renderVinyl(cv, br.width, br.height, wells, topY).catch(() => {});
+}
+// the little preview in the Look tab
+function refreshPreviewVinyl(pv) {
+  if (!pv || !pv.isConnected || !vinylOn()) return;
+  let cv = pv.querySelector('.pvinyl');
+  if (!cv) { cv = document.createElement('canvas'); cv.className = 'pvinyl'; pv.prepend(cv); }
+  const r = pv.getBoundingClientRect();
+  renderVinyl(cv, r.width, r.height, wellShapes(pv, pv.querySelectorAll('.ctl')), 0).catch(() => {});
+}

@@ -32,7 +32,8 @@ const Emu = {
     this.search = new RamSearch(core);
     this.paused = false; this.userPaused = false; this.acc = 0; this.last = 0; this.playT = performance.now();
     Audio_.flush(); Audio_.apply(S);
-    this.timers = [setInterval(() => this.persistSram(), 2500), setInterval(() => this.autoState(), Math.max(10, S.autoSaveSec) * 1000)];
+    this.autoT = 0; this.autoLast = performance.now(); this._ledN = -1;
+    this.timers = [setInterval(() => this.persistSram(), 2500), setInterval(() => this.autoTick(), 250)];
     this.requestWake();
     cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(t => this.tick(t));
     this.hud();
@@ -63,6 +64,25 @@ const Emu = {
     const s = core.sram(); if (!s) return;
     const c = crc32(s); if (c === this.sramCrc) return;
     this.sramCrc = c; await DB.put('saves', this.game.id, s);
+  },
+  // auto snapshot clock: counts play time only, so the lights freeze while paused
+  autoTick() {
+    const now = performance.now(), dt = now - this.autoLast; this.autoLast = now;
+    if (!this.active) return;
+    if (!this.paused) this.autoT += dt;
+    const per = Math.max(10, S.autoSaveSec) * 1000;
+    if (this.autoT >= per) { this.autoT = 0; this.autoState(); this.saveLeds(true); return; }
+    this.saveLeds();
+  },
+  saveLeds(fire) {
+    const box = document.getElementById('saveLeds'); if (!box) return;
+    const on = S.saveLights && S.autoResume;
+    box.classList.toggle('on', on); if (!on) { this._ledN = -1; return; }
+    if (fire) { box.classList.add('fire'); this._ledN = 6; [...box.children].forEach(i => i.classList.add('lit')); clearTimeout(this._fireT); this._fireT = setTimeout(() => { box.classList.remove('fire'); this._ledN = -1; this.saveLeds(); }, 650); return; }
+    if (box.classList.contains('fire')) return;
+    const n = Math.min(5, Math.floor(this.autoT / (Math.max(10, S.autoSaveSec) * 1000) * 6));
+    if (n === this._ledN) return; this._ledN = n;
+    [...box.children].forEach((i, k) => i.classList.toggle('lit', k < n));
   },
   thumb() { try { return frameToCanvas(core.video()).toDataURL('image/jpeg', 0.82); } catch (e) { return null; } },
   async autoState() {
@@ -205,7 +225,7 @@ const Emu = {
     if (device && !S.shell) stage.style.paddingTop = 'env(safe-area-inset-top,0px)';
     player.classList.toggle('port', device);
     player.style.setProperty('--stage-h', `calc(${stageH}px + env(safe-area-inset-top,0px))`);
-    const body = $('#body'); body.classList.toggle('show', device);
+    const body = $('#body'); body.classList.toggle('show', device); refreshVinyl();
     renderer.setSize(cw, ch);
     const cy = device ? (stageH - logo) / 2 : H / 2;
     const amb = $('#amb').style; amb.setProperty('--amb-y', (cy / H * 100).toFixed(1) + '%'); amb.setProperty('--amb-w', Math.min(140, cw / W * 100 * 0.85 + 20).toFixed(0) + '%'); amb.setProperty('--amb-h', Math.min(120, ch / H * 100 * 0.9 + 18).toFixed(0) + '%');
@@ -257,8 +277,11 @@ const Emu = {
     const cv = $('#screen');
     if (!cv.captureStream || typeof MediaRecorder === 'undefined') return toast('Recording is not supported here');
     const stream = new MediaStream([...cv.captureStream(60).getVideoTracks(), ...Audio_.recordStream().getAudioTracks()]);
-    const type = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
-    const rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 6e6 } : undefined); const chunks = [];
+    // MP4 (H.264 + AAC) first so clips go straight to WhatsApp and the gallery; older WebViews fall back to WebM
+    // (only with AAC audio: WhatsApp turns down MP4s that carry Opus)
+    const type = ['video/mp4;codecs=avc1.42E01F,mp4a.40.2', 'video/mp4;codecs=avc1.4D401F,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    let rec; try { rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 6e6 } : undefined); } catch (e) { rec = new MediaRecorder(stream); }
+    const chunks = [];
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     rec.onstop = () => { const blob = new Blob(chunks, { type: rec.mimeType }); download(`${safeName(this.game?.name || 'clip')}-${stamp()}.${rec.mimeType.includes('mp4') ? 'mp4' : 'webm'}`, blob); toast('Clip saved'); };
     rec.start(1000); this.rec = rec; $('#hudRec').classList.remove('hidden'); this.updateLed(); toast('Recording. Open the menu to stop.');

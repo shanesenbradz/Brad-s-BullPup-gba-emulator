@@ -401,6 +401,27 @@ textarea{width:100%;background:var(--raised);border:0;border-radius:10px;padding
 .pv .pwall{display:none;background:var(--wall-url) center/cover}
 [data-wall=on] .pv .pwall{display:block}
 .pv .ctl{z-index:1}
+
+/* ---------- auto save countdown lights ---------- */
+.save-leds{position:absolute;left:7%;top:calc(var(--stage-h) + 18px);display:none;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;background:var(--well);box-shadow:inset 0 2px 4px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.14);z-index:1}
+#player.port .save-leds.on{display:flex}
+.save-leds i{width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.16),rgba(255,255,255,0) 45%),#0b0c0e;box-shadow:inset 0 1px 2px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.08);transition:background-color .35s var(--ease),box-shadow .35s var(--ease)}
+.save-leds i.lit{background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),rgba(255,255,255,0) 45%),#5bd68a;box-shadow:0 0 6px rgba(91,214,138,.75),inset 0 -1px 1px rgba(0,60,25,.35)}
+.save-leds.fire i{animation:ledfire .65s var(--ease)}
+@keyframes ledfire{0%,100%{filter:brightness(1)}30%{filter:brightness(1.6);box-shadow:0 0 10px rgba(120,240,165,.95)}}
+
+/* ---------- vinyl wrap wallpaper ---------- */
+#vinyl{position:absolute;left:0;top:0;width:100%;height:100%;display:none}
+[data-wall=on][data-vinyl=on] #vinyl{display:block}
+[data-wall=on][data-vinyl=on] #wall{display:none}
+.pv .pvinyl{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;display:none}
+[data-wall=on][data-vinyl=on] .pv .pvinyl{display:block}
+[data-wall=on][data-vinyl=on] .pv .pwall{display:none}
+/* laminate: a soft sheen streak and a hint of orange peel on top of the print */
+[data-wall=on][data-vinyl=on] :is(#shade,.pv .shade):after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(118deg,rgba(255,255,255,0) 18%,rgba(255,255,255,.07) 27%,rgba(255,255,255,0) 36%,rgba(255,255,255,0) 64%,rgba(255,255,255,.04) 70%,rgba(255,255,255,0) 76%)}
+[data-wall=on][data-vinyl=on][data-gloss=matte] :is(#shade,.pv .shade):after{opacity:.35}
+[data-wall=on][data-vinyl=on][data-btn=console] .ctl:not([data-k=dpad]):before{box-shadow:inset 0 3px 6px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.18)}
 </style>
 </head>
 <body>
@@ -434,7 +455,7 @@ textarea{width:100%;background:var(--raised);border:0;border-radius:10px;padding
 
 <!-- PLAYER -->
 <section id="player" class="view hidden">
-  <div id="body"><div id="wall"></div><div id="shade"></div><div class="pill-led"><span class="led" id="plateLed"></span><svg viewBox="0 0 24 24"><path d="M12 3v8M6.3 7a8 8 0 1 0 11.4 0"/></svg></div><div class="grille"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="decal" id="decal"></div><div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 18" shape-rendering="crispEdges"><rect x="13" y="1" width="10" height="1" fill="#0e0f11"/><rect x="12" y="2" width="1" height="1" fill="#0e0f11"/><rect x="13" y="2" width="1" height="1" fill="#3e434c"/><rect x="14" y="2" width="8" height="1" fill="#6a717d"/><rect x="22" y="2" width="1" height="1" fill="#3e434c"/><rect x="23" y="2" width="1" height="1" fill="#0e0f11"/><rect x="11" y="3" width="1" height="1" fill="#0e0f11"/><rect x="12" y="3" width="1" height="1" fill="#d9a441"/><rect x="13" y="3" width="10" height="1" fill="#3e434c"/><rect x="23" y="3" width="1" height="1" fill="#d9a441"/><rect x="24" y="3" width="1" height="1" fill="#0e0f11"/><rect x="12" y="4" width="1" height="1" fill="#0e0f11"/><rect x="13" y="4" width="10" height="1" fill="#3e434c"/><rect x="23" y="4" width="1" height="1" fill="#0e0f11"/><rect x="1" y="5" width="11" height="1" fill="#0e0f11"/><rect x="12" y="5" width="12" height="1" fill="#3e434c"/><rect x="24" y="5" width="2" height="1" fill="#0e0f11"/><rect x="0" y="6" width="1" height="1" fill="#0e0f11"/><rect x="1" y="6" width="25" height="1" fill="#acb3be"/><rect x="26" y="6" width="8" height="1" fill="#0e0f11"/><rect x="38" y="6" width="2" height="1" fill="#0e0f11"/><rect x="0" y="7" width="1" height="1" fill="#3e434c"/><rect x="1" y="7" width="25" height="1" fill="#6a717d"/><rect x="26" y="7" width="8" height="1" fill="#acb3be"/><rect x="34" y="7" width="4" height="1" fill="#0e0f11"/><rect x="38" y="7" width="2" height="1" fill="#3e434c"/><rect x="0" y="8" width="1" height="1" fill="#3e434c"/><rect x="1" y="8" width="14" height="1" fill="#6a717d"/><rect x="15" y="8" width="4" height="1" fill="#d9a441"/><rect x="19" y="8" width="19" height="1" fill="#6a717d"/><rect x="38" y="8" width="2" height="1" fill="#3e434c"/><rect x="0" y="9" width="1" height="1" fill="#3e434c"/><rect x="1" y="9" width="33" height="1" fill="#6a717d"/><rect x="34" y="9" width="6" height="1" fill="#3e434c"/><rect x="0" y="10" width="1" height="1" fill="#3e434c"/><rect x="1" y="10" width="25" height="1" fill="#6a717d"/><rect x="26" y="10" width="8" height="1" fill="#3e434c"/><rect x="34" y="10" width="4" height="1" fill="#0e0f11"/><rect x="38" y="10" width="2" height="1" fill="#3e434c"/><rect x="0" y="11" width="26" height="1" fill="#3e434c"/><rect x="26" y="11" width="8" height="1" fill="#0e0f11"/><rect x="38" y="11" width="2" height="1" fill="#0e0f11"/><rect x="0" y="12" width="7" height="1" fill="#3e434c"/><rect x="7" y="12" width="1" height="1" fill="#0e0f11"/><rect x="8" y="12" width="1" height="1" fill="#3e434c"/><rect x="9" y="12" width="2" height="1" fill="#6a717d"/><rect x="11" y="12" width="1" height="1" fill="#3e434c"/><rect x="12" y="12" width="3" height="1" fill="#0e0f11"/><rect x="15" y="12" width="8" height="1" fill="#3e434c"/><rect x="23" y="12" width="3" height="1" fill="#0e0f11"/><rect x="0" y="13" width="8" height="1" fill="#0e0f11"/><rect x="8" y="13" width="1" height="1" fill="#3e434c"/><rect x="9" y="13" width="2" height="1" fill="#6a717d"/><rect x="11" y="13" width="1" height="1" fill="#3e434c"/><rect x="12" y="13" width="1" height="1" fill="#0e0f11"/><rect x="14" y="13" width="1" height="1" fill="#0e0f11"/><rect x="15" y="13" width="1" height="1" fill="#3e434c"/><rect x="16" y="13" width="2" height="1" fill="#0e0f11"/><rect x="18" y="13" width="1" height="1" fill="#d9a441"/><rect x="19" y="13" width="1" height="1" fill="#0e0f11"/><rect x="20" y="13" width="1" height="1" fill="#3e434c"/><rect x="21" y="13" width="1" height="1" fill="#6a717d"/><rect x="22" y="13" width="1" height="1" fill="#3e434c"/><rect x="23" y="13" width="1" height="1" fill="#0e0f11"/><rect x="7" y="14" width="1" height="1" fill="#0e0f11"/><rect x="8" y="14" width="1" height="1" fill="#3e434c"/><rect x="9" y="14" width="2" height="1" fill="#6a717d"/><rect x="11" y="14" width="1" height="1" fill="#3e434c"/><rect x="12" y="14" width="1" height="1" fill="#0e0f11"/><rect x="14" y="14" width="1" height="1" fill="#0e0f11"/><rect x="15" y="14" width="1" height="1" fill="#3e434c"/><rect x="16" y="14" width="4" height="1" fill="#0e0f11"/><rect x="20" y="14" width="1" height="1" fill="#3e434c"/><rect x="21" y="14" width="1" height="1" fill="#6a717d"/><rect x="22" y="14" width="1" height="1" fill="#3e434c"/><rect x="23" y="14" width="1" height="1" fill="#0e0f11"/><rect x="8" y="15" width="1" height="1" fill="#0e0f11"/><rect x="9" y="15" width="1" height="1" fill="#3e434c"/><rect x="10" y="15" width="1" height="1" fill="#6a717d"/><rect x="11" y="15" width="2" height="1" fill="#3e434c"/><rect x="13" y="15" width="2" height="1" fill="#0e0f11"/><rect x="15" y="15" width="6" height="1" fill="#3e434c"/><rect x="21" y="15" width="1" height="1" fill="#6a717d"/><rect x="22" y="15" width="1" height="1" fill="#3e434c"/><rect x="23" y="15" width="1" height="1" fill="#0e0f11"/><rect x="8" y="16" width="1" height="1" fill="#0e0f11"/><rect x="9" y="16" width="4" height="1" fill="#3e434c"/><rect x="13" y="16" width="1" height="1" fill="#0e0f11"/><rect x="15" y="16" width="5" height="1" fill="#0e0f11"/><rect x="20" y="16" width="3" height="1" fill="#3e434c"/><rect x="23" y="16" width="1" height="1" fill="#0e0f11"/><rect x="9" y="17" width="4" height="1" fill="#0e0f11"/><rect x="20" y="17" width="1" height="1" fill="#0e0f11"/><rect x="21" y="17" width="3" height="1" fill="#3e434c"/><rect x="24" y="17" width="1" height="1" fill="#0e0f11"/></svg><span>BRAD'S BULLPUP  ·  <span id="plateSN">SN 00000000</span></span></div></div>
+  <div id="body"><div id="wall"></div><canvas id="vinyl"></canvas><div id="shade"></div><div class="save-leds" id="saveLeds" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="pill-led"><span class="led" id="plateLed"></span><svg viewBox="0 0 24 24"><path d="M12 3v8M6.3 7a8 8 0 1 0 11.4 0"/></svg></div><div class="grille"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="decal" id="decal"></div><div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 18" shape-rendering="crispEdges"><rect x="13" y="1" width="10" height="1" fill="#0e0f11"/><rect x="12" y="2" width="1" height="1" fill="#0e0f11"/><rect x="13" y="2" width="1" height="1" fill="#3e434c"/><rect x="14" y="2" width="8" height="1" fill="#6a717d"/><rect x="22" y="2" width="1" height="1" fill="#3e434c"/><rect x="23" y="2" width="1" height="1" fill="#0e0f11"/><rect x="11" y="3" width="1" height="1" fill="#0e0f11"/><rect x="12" y="3" width="1" height="1" fill="#d9a441"/><rect x="13" y="3" width="10" height="1" fill="#3e434c"/><rect x="23" y="3" width="1" height="1" fill="#d9a441"/><rect x="24" y="3" width="1" height="1" fill="#0e0f11"/><rect x="12" y="4" width="1" height="1" fill="#0e0f11"/><rect x="13" y="4" width="10" height="1" fill="#3e434c"/><rect x="23" y="4" width="1" height="1" fill="#0e0f11"/><rect x="1" y="5" width="11" height="1" fill="#0e0f11"/><rect x="12" y="5" width="12" height="1" fill="#3e434c"/><rect x="24" y="5" width="2" height="1" fill="#0e0f11"/><rect x="0" y="6" width="1" height="1" fill="#0e0f11"/><rect x="1" y="6" width="25" height="1" fill="#acb3be"/><rect x="26" y="6" width="8" height="1" fill="#0e0f11"/><rect x="38" y="6" width="2" height="1" fill="#0e0f11"/><rect x="0" y="7" width="1" height="1" fill="#3e434c"/><rect x="1" y="7" width="25" height="1" fill="#6a717d"/><rect x="26" y="7" width="8" height="1" fill="#acb3be"/><rect x="34" y="7" width="4" height="1" fill="#0e0f11"/><rect x="38" y="7" width="2" height="1" fill="#3e434c"/><rect x="0" y="8" width="1" height="1" fill="#3e434c"/><rect x="1" y="8" width="14" height="1" fill="#6a717d"/><rect x="15" y="8" width="4" height="1" fill="#d9a441"/><rect x="19" y="8" width="19" height="1" fill="#6a717d"/><rect x="38" y="8" width="2" height="1" fill="#3e434c"/><rect x="0" y="9" width="1" height="1" fill="#3e434c"/><rect x="1" y="9" width="33" height="1" fill="#6a717d"/><rect x="34" y="9" width="6" height="1" fill="#3e434c"/><rect x="0" y="10" width="1" height="1" fill="#3e434c"/><rect x="1" y="10" width="25" height="1" fill="#6a717d"/><rect x="26" y="10" width="8" height="1" fill="#3e434c"/><rect x="34" y="10" width="4" height="1" fill="#0e0f11"/><rect x="38" y="10" width="2" height="1" fill="#3e434c"/><rect x="0" y="11" width="26" height="1" fill="#3e434c"/><rect x="26" y="11" width="8" height="1" fill="#0e0f11"/><rect x="38" y="11" width="2" height="1" fill="#0e0f11"/><rect x="0" y="12" width="7" height="1" fill="#3e434c"/><rect x="7" y="12" width="1" height="1" fill="#0e0f11"/><rect x="8" y="12" width="1" height="1" fill="#3e434c"/><rect x="9" y="12" width="2" height="1" fill="#6a717d"/><rect x="11" y="12" width="1" height="1" fill="#3e434c"/><rect x="12" y="12" width="3" height="1" fill="#0e0f11"/><rect x="15" y="12" width="8" height="1" fill="#3e434c"/><rect x="23" y="12" width="3" height="1" fill="#0e0f11"/><rect x="0" y="13" width="8" height="1" fill="#0e0f11"/><rect x="8" y="13" width="1" height="1" fill="#3e434c"/><rect x="9" y="13" width="2" height="1" fill="#6a717d"/><rect x="11" y="13" width="1" height="1" fill="#3e434c"/><rect x="12" y="13" width="1" height="1" fill="#0e0f11"/><rect x="14" y="13" width="1" height="1" fill="#0e0f11"/><rect x="15" y="13" width="1" height="1" fill="#3e434c"/><rect x="16" y="13" width="2" height="1" fill="#0e0f11"/><rect x="18" y="13" width="1" height="1" fill="#d9a441"/><rect x="19" y="13" width="1" height="1" fill="#0e0f11"/><rect x="20" y="13" width="1" height="1" fill="#3e434c"/><rect x="21" y="13" width="1" height="1" fill="#6a717d"/><rect x="22" y="13" width="1" height="1" fill="#3e434c"/><rect x="23" y="13" width="1" height="1" fill="#0e0f11"/><rect x="7" y="14" width="1" height="1" fill="#0e0f11"/><rect x="8" y="14" width="1" height="1" fill="#3e434c"/><rect x="9" y="14" width="2" height="1" fill="#6a717d"/><rect x="11" y="14" width="1" height="1" fill="#3e434c"/><rect x="12" y="14" width="1" height="1" fill="#0e0f11"/><rect x="14" y="14" width="1" height="1" fill="#0e0f11"/><rect x="15" y="14" width="1" height="1" fill="#3e434c"/><rect x="16" y="14" width="4" height="1" fill="#0e0f11"/><rect x="20" y="14" width="1" height="1" fill="#3e434c"/><rect x="21" y="14" width="1" height="1" fill="#6a717d"/><rect x="22" y="14" width="1" height="1" fill="#3e434c"/><rect x="23" y="14" width="1" height="1" fill="#0e0f11"/><rect x="8" y="15" width="1" height="1" fill="#0e0f11"/><rect x="9" y="15" width="1" height="1" fill="#3e434c"/><rect x="10" y="15" width="1" height="1" fill="#6a717d"/><rect x="11" y="15" width="2" height="1" fill="#3e434c"/><rect x="13" y="15" width="2" height="1" fill="#0e0f11"/><rect x="15" y="15" width="6" height="1" fill="#3e434c"/><rect x="21" y="15" width="1" height="1" fill="#6a717d"/><rect x="22" y="15" width="1" height="1" fill="#3e434c"/><rect x="23" y="15" width="1" height="1" fill="#0e0f11"/><rect x="8" y="16" width="1" height="1" fill="#0e0f11"/><rect x="9" y="16" width="4" height="1" fill="#3e434c"/><rect x="13" y="16" width="1" height="1" fill="#0e0f11"/><rect x="15" y="16" width="5" height="1" fill="#0e0f11"/><rect x="20" y="16" width="3" height="1" fill="#3e434c"/><rect x="23" y="16" width="1" height="1" fill="#0e0f11"/><rect x="9" y="17" width="4" height="1" fill="#0e0f11"/><rect x="20" y="17" width="1" height="1" fill="#0e0f11"/><rect x="21" y="17" width="3" height="1" fill="#3e434c"/><rect x="24" y="17" width="1" height="1" fill="#0e0f11"/></svg><span>BRAD'S BULLPUP  ·  <span id="plateSN">SN 00000000</span></span></div></div>
   <div id="amb"></div>
   <div id="stage"><div id="screenWrap"><span class="led" id="bezLed"></span><canvas id="screen" width="240" height="160"></canvas></div><div id="logoStrip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 18" shape-rendering="crispEdges"><rect x="13" y="1" width="10" height="1" fill="#0e0f11"/><rect x="12" y="2" width="1" height="1" fill="#0e0f11"/><rect x="13" y="2" width="1" height="1" fill="#3e434c"/><rect x="14" y="2" width="8" height="1" fill="#6a717d"/><rect x="22" y="2" width="1" height="1" fill="#3e434c"/><rect x="23" y="2" width="1" height="1" fill="#0e0f11"/><rect x="11" y="3" width="1" height="1" fill="#0e0f11"/><rect x="12" y="3" width="1" height="1" fill="#d9a441"/><rect x="13" y="3" width="10" height="1" fill="#3e434c"/><rect x="23" y="3" width="1" height="1" fill="#d9a441"/><rect x="24" y="3" width="1" height="1" fill="#0e0f11"/><rect x="12" y="4" width="1" height="1" fill="#0e0f11"/><rect x="13" y="4" width="10" height="1" fill="#3e434c"/><rect x="23" y="4" width="1" height="1" fill="#0e0f11"/><rect x="1" y="5" width="11" height="1" fill="#0e0f11"/><rect x="12" y="5" width="12" height="1" fill="#3e434c"/><rect x="24" y="5" width="2" height="1" fill="#0e0f11"/><rect x="0" y="6" width="1" height="1" fill="#0e0f11"/><rect x="1" y="6" width="25" height="1" fill="#acb3be"/><rect x="26" y="6" width="8" height="1" fill="#0e0f11"/><rect x="38" y="6" width="2" height="1" fill="#0e0f11"/><rect x="0" y="7" width="1" height="1" fill="#3e434c"/><rect x="1" y="7" width="25" height="1" fill="#6a717d"/><rect x="26" y="7" width="8" height="1" fill="#acb3be"/><rect x="34" y="7" width="4" height="1" fill="#0e0f11"/><rect x="38" y="7" width="2" height="1" fill="#3e434c"/><rect x="0" y="8" width="1" height="1" fill="#3e434c"/><rect x="1" y="8" width="14" height="1" fill="#6a717d"/><rect x="15" y="8" width="4" height="1" fill="#d9a441"/><rect x="19" y="8" width="19" height="1" fill="#6a717d"/><rect x="38" y="8" width="2" height="1" fill="#3e434c"/><rect x="0" y="9" width="1" height="1" fill="#3e434c"/><rect x="1" y="9" width="33" height="1" fill="#6a717d"/><rect x="34" y="9" width="6" height="1" fill="#3e434c"/><rect x="0" y="10" width="1" height="1" fill="#3e434c"/><rect x="1" y="10" width="25" height="1" fill="#6a717d"/><rect x="26" y="10" width="8" height="1" fill="#3e434c"/><rect x="34" y="10" width="4" height="1" fill="#0e0f11"/><rect x="38" y="10" width="2" height="1" fill="#3e434c"/><rect x="0" y="11" width="26" height="1" fill="#3e434c"/><rect x="26" y="11" width="8" height="1" fill="#0e0f11"/><rect x="38" y="11" width="2" height="1" fill="#0e0f11"/><rect x="0" y="12" width="7" height="1" fill="#3e434c"/><rect x="7" y="12" width="1" height="1" fill="#0e0f11"/><rect x="8" y="12" width="1" height="1" fill="#3e434c"/><rect x="9" y="12" width="2" height="1" fill="#6a717d"/><rect x="11" y="12" width="1" height="1" fill="#3e434c"/><rect x="12" y="12" width="3" height="1" fill="#0e0f11"/><rect x="15" y="12" width="8" height="1" fill="#3e434c"/><rect x="23" y="12" width="3" height="1" fill="#0e0f11"/><rect x="0" y="13" width="8" height="1" fill="#0e0f11"/><rect x="8" y="13" width="1" height="1" fill="#3e434c"/><rect x="9" y="13" width="2" height="1" fill="#6a717d"/><rect x="11" y="13" width="1" height="1" fill="#3e434c"/><rect x="12" y="13" width="1" height="1" fill="#0e0f11"/><rect x="14" y="13" width="1" height="1" fill="#0e0f11"/><rect x="15" y="13" width="1" height="1" fill="#3e434c"/><rect x="16" y="13" width="2" height="1" fill="#0e0f11"/><rect x="18" y="13" width="1" height="1" fill="#d9a441"/><rect x="19" y="13" width="1" height="1" fill="#0e0f11"/><rect x="20" y="13" width="1" height="1" fill="#3e434c"/><rect x="21" y="13" width="1" height="1" fill="#6a717d"/><rect x="22" y="13" width="1" height="1" fill="#3e434c"/><rect x="23" y="13" width="1" height="1" fill="#0e0f11"/><rect x="7" y="14" width="1" height="1" fill="#0e0f11"/><rect x="8" y="14" width="1" height="1" fill="#3e434c"/><rect x="9" y="14" width="2" height="1" fill="#6a717d"/><rect x="11" y="14" width="1" height="1" fill="#3e434c"/><rect x="12" y="14" width="1" height="1" fill="#0e0f11"/><rect x="14" y="14" width="1" height="1" fill="#0e0f11"/><rect x="15" y="14" width="1" height="1" fill="#3e434c"/><rect x="16" y="14" width="4" height="1" fill="#0e0f11"/><rect x="20" y="14" width="1" height="1" fill="#3e434c"/><rect x="21" y="14" width="1" height="1" fill="#6a717d"/><rect x="22" y="14" width="1" height="1" fill="#3e434c"/><rect x="23" y="14" width="1" height="1" fill="#0e0f11"/><rect x="8" y="15" width="1" height="1" fill="#0e0f11"/><rect x="9" y="15" width="1" height="1" fill="#3e434c"/><rect x="10" y="15" width="1" height="1" fill="#6a717d"/><rect x="11" y="15" width="2" height="1" fill="#3e434c"/><rect x="13" y="15" width="2" height="1" fill="#0e0f11"/><rect x="15" y="15" width="6" height="1" fill="#3e434c"/><rect x="21" y="15" width="1" height="1" fill="#6a717d"/><rect x="22" y="15" width="1" height="1" fill="#3e434c"/><rect x="23" y="15" width="1" height="1" fill="#0e0f11"/><rect x="8" y="16" width="1" height="1" fill="#0e0f11"/><rect x="9" y="16" width="4" height="1" fill="#3e434c"/><rect x="13" y="16" width="1" height="1" fill="#0e0f11"/><rect x="15" y="16" width="5" height="1" fill="#0e0f11"/><rect x="20" y="16" width="3" height="1" fill="#3e434c"/><rect x="23" y="16" width="1" height="1" fill="#0e0f11"/><rect x="9" y="17" width="4" height="1" fill="#0e0f11"/><rect x="20" y="17" width="1" height="1" fill="#0e0f11"/><rect x="21" y="17" width="3" height="1" fill="#3e434c"/><rect x="24" y="17" width="1" height="1" fill="#0e0f11"/></svg><span>Brad's Bullpup</span></div></div>
   <div id="hud"><span id="hudSpeed"></span><span id="hudFps"></span><span id="hudRec" class="hidden">REC</span></div>
@@ -1288,7 +1309,7 @@ const DEFAULTS = {
   // look
   theme: 'graphite', accent: 'brass', grid: 'regular', motion: 'full', skin: 'gunmetal', texture: 'auto', btnStyle: 'console', press: 'subtle', labels: true,
   click: 'off', clickVol: 1, haptic: 'light', ambient: 'subtle', bezel: false, glass: false, led: true,
-  shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0,
+  shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0, vinyl: 'soft', saveLights: false,
   // system
   autoResume: true, autoSaveSec: 30, pauseOnMenu: true, pauseHidden: true, skipBios: true, idle: 'remove', opposing: false, wakeLock: true, slot: 1,
 };
@@ -1419,7 +1440,9 @@ const Touch = {
     }
     this.measure();
     this.syncToggles();
+    refreshVinyl();
   },
+  setOpacity() { const L = this.layout(); for (const k in this.els) this.els[k].style.opacity = (L[k]?.o ?? 1) * S.ctlOpacity; },
   measure() { this.rects = {}; for (const k in this.els) { const r = this.els[k].getBoundingClientRect(); this.rects[k] = { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; } },
   syncToggles() { this.els.ff?.classList.toggle('on', Emu.ffToggle); this.els.ta?.classList.toggle('on', !!(Input.turboLatch & 1)); this.els.tb?.classList.toggle('on', !!(Input.turboLatch & 2)); },
   hit(x, y) {
@@ -1519,7 +1542,7 @@ const Touch = {
     c.x = clamp((e.clientX - ox) / r.width * 100, 0, 100); c.y = clamp((e.clientY - oy) / r.height * 100, 0, 100);
     const el = this.els[this.sel]; el.style.left = c.x + '%'; el.style.top = c.y + '%';
   },
-  editUp() { this.drag = null; },
+  editUp() { this.drag = null; refreshVinyl(); },
   selUpdate() {
     const k = this.sel, L = this.layout();
     $('#ebName').textContent = k ? `${(CTL_DEFS[k].label || 'D-pad')}  (${this.orient})` : `Drag controls to move them (${this.orient})`;
@@ -1559,11 +1582,12 @@ const SKINS = {
 function applyLook() {
   const r = document.documentElement, d = r.dataset;
   d.theme = S.theme; d.btn = S.btnStyle; d.press = S.press; d.labels = S.labels ? 'on' : 'off';
-  d.amb = S.ambient; d.shell = S.shell ? 'on' : 'off'; d.gloss = S.gloss; d.grille = S.grille ? 'on' : 'off'; d.wall = S.wall && _wallUrl ? 'on' : 'off'; d.bezel = S.bezel ? 'on' : 'off'; d.glass = S.glass ? 'on' : 'off'; d.led = S.led ? 'on' : 'off'; d.motion = S.motion;
+  d.amb = S.ambient; d.shell = S.shell ? 'on' : 'off'; d.gloss = S.gloss; d.grille = S.grille ? 'on' : 'off'; d.wall = S.wall && _wallUrl ? 'on' : 'off'; d.bezel = S.bezel ? 'on' : 'off'; d.glass = S.glass ? 'on' : 'off'; d.led = S.led ? 'on' : 'off'; d.motion = S.motion; d.vinyl = S.vinyl !== 'off' ? 'on' : 'off';
   const sk = SKINS[S.skin] || SKINS.gunmetal;
   d.tex = S.texture === 'auto' ? (d.wall === 'on' ? 'matte' : sk.clear ? 'pcb' : 'matte') : S.texture;
   r.style.setProperty('--armory', armoryTile());
   const wall = document.getElementById('wall'); if (wall) wall.style.filter = `blur(${S.wallBlur}px) brightness(${(1 - S.wallDim).toFixed(2)})`;
+  const vc = document.getElementById('vinyl'); if (vc) vc.style.filter = `brightness(${(1 - S.wallDim).toFixed(2)})`;
   const dec = document.getElementById('decal'); if (dec) { dec.innerHTML = SPRITES[S.decal] || ''; dec.classList.toggle('show', !!SPRITES[S.decal]); }
   SKIN_KEYS.forEach((k, i) => r.style.setProperty('--' + k, sk.v[i]));
   if (d.wall === 'on') r.style.setProperty('--well', 'rgba(0,0,0,.34)');
@@ -1571,7 +1595,8 @@ function applyLook() {
   r.style.setProperty('--acc', a[0]); r.style.setProperty('--acc-ink', a[1]); r.style.setProperty('--acc-text', S.theme === 'light' ? a[3] : a[2]);
   r.style.setProperty('--cover-min', { compact: '112px', regular: '148px', large: '208px' }[S.grid] || '148px');
   const tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.content = S.theme === 'light' ? '#f2f2f7' : S.theme === 'oled' ? '#000000' : '#111113';
-  if (typeof Emu !== 'undefined' && Emu.active) { Emu.layoutScreen(); Emu.updateLed(); }
+  if (typeof Emu !== 'undefined' && Emu.active) { Emu.layoutScreen(); Emu.updateLed(); Emu.saveLeds(); }
+  refreshVinyl();
 }
 
 /* ---- tactile feedback: haptics + synthesized click ---- */
@@ -1624,7 +1649,7 @@ function spriteFor(seed) { const keys = ['pistol', 'revolver', 'raygun', 'soaker
 
 /* ---- custom wallpaper on the device body ---- */
 let _wallUrl = null;
-function applyWall(u) { _wallUrl = u || null; const w = document.getElementById('wall'); if (w) w.style.backgroundImage = u ? `url(${u})` : ''; document.documentElement.style.setProperty('--wall-url', u ? `url(${u})` : 'none'); }
+function applyWall(u) { _wallUrl = u || null; _wallVer++; const w = document.getElementById('wall'); if (w) w.style.backgroundImage = u ? `url(${u})` : ''; document.documentElement.style.setProperty('--wall-url', u ? `url(${u})` : 'none'); }
 async function loadWallpaper() { try { applyWall(await DB.get('kv', 'wallpaper')); } catch (e) {} applyLook(); }
 async function setWallpaperFromFile(f) {
   const bmp = await createImageBitmap(f);
@@ -1635,6 +1660,144 @@ async function setWallpaperFromFile(f) {
   await DB.put('kv', 'wallpaper', url); S.wall = true; saveSettings(); applyWall(url); applyLook();
 }
 async function clearWallpaper() { await DB.del('kv', 'wallpaper'); S.wall = false; saveSettings(); applyWall(null); applyLook(); }
+
+/* ---- vinyl wrap: the wallpaper as a printed skin that rolls over the body edges and dips into the button wells ----
+   Everything is baked once into a canvas (per layout), so it costs nothing while a game runs. */
+let _pv = null, _wallImg = null, _wallImgUrl = null, _wallVer = 0, _vinylKey = '', _vinylT = 0;
+async function wallImage() {
+  if (!_wallUrl) return null;
+  if (_wallImg && _wallImgUrl === _wallUrl) return _wallImg;
+  const im = new Image(); im.src = _wallUrl; await im.decode();
+  _wallImg = im; _wallImgUrl = _wallUrl; return im;
+}
+const vinylOn = () => document.documentElement.dataset.wall === 'on' && S.vinyl !== 'off';
+// molded wells under the controls, as rounded boxes in host-relative CSS px
+function wellShapes(host, ctls) {
+  if (S.btnStyle !== 'console') return [];
+  const hr = host.getBoundingClientRect(), out = [];
+  for (const e of ctls) {
+    if (!e.isConnected || e.classList.contains('ghost')) continue;
+    const r = e.getBoundingClientRect(); if (!r.width) continue;
+    const cx = r.left + r.width / 2 - hr.left, cy = r.top + r.height / 2 - hr.top, w = r.width, h = r.height;
+    let boxes;
+    if (e.dataset.k === 'dpad') boxes = [[w * 0.52, w * 0.205, w * 0.07], [w * 0.205, w * 0.52, w * 0.07]];
+    else if (e.classList.contains('pill')) boxes = [[w / 2 + 5, h / 2 + 5, h / 2 + 5]];
+    else boxes = [[w / 2 + 7, h / 2 + 7, Math.min(w, h) / 2 + 7]];
+    const R = Math.max(...boxes.map(b => Math.max(b[0], b[1])));
+    out.push({ cx, cy, R, boxes });
+  }
+  return out;
+}
+function sdWell(wl, x, y) {
+  let d = Infinity; const px = Math.abs(x - wl.cx), py = Math.abs(y - wl.cy);
+  for (const [hx, hy, r] of wl.boxes) {
+    const qx = px - (hx - r), qy = py - (hy - r);
+    const o = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+    if (o < d) d = o;
+  }
+  return d;
+}
+// 1D edge roll: screen position -> position on the flat sheet, plus how far the surface has turned away (0..1)
+function rollAxis(n, scale, len, r0, r1, offset) {
+  const S_ = new Float32Array(n), N = new Float32Array(n), A = Math.PI / 2;
+  for (let i = 0; i < n; i++) {
+    const x = (i + 0.5) / scale - offset;
+    let s, t = 0;
+    if (x < r0) { t = Math.min(1, (r0 - Math.max(x, 0)) / r0); s = r0 * A - r0 * Math.asin(t); t = -t; }
+    else if (x > len - r1) { t = Math.min(1, (x - (len - r1)) / r1); s = r0 * A + (len - r0 - r1) + r1 * Math.asin(t); }
+    else s = r0 * A + (x - r0);
+    S_[i] = s; N[i] = t;
+  }
+  return { S: S_, N, total: (len - r0 - r1) + (r0 + r1) * A };
+}
+async function renderVinyl(cv, W, H, wells, topY = 0) {
+  const img = await wallImage(); if (!img || W < 20 || H < 20) return;
+  const k = S.vinyl === 'deep' ? 1.8 : 1;
+  const sc = Math.min(Math.min(devicePixelRatio || 1, 1.6), 1400 / Math.max(W, H));
+  const w = Math.round(W * sc), h = Math.round(H * sc);
+  const Hv = Math.max(40, H - topY);
+  const rx = Math.min(W * 0.07 * k, 64), rb = Math.min(Hv * 0.045 * k, 56), rt = Math.min(16 * k, 32);
+  const cols = rollAxis(w, sc, W, rx, rx, 0), rows = rollAxis(h, sc, Hv, rt, rb, topY);
+  // the flat sheet, cover-fitted, with the wallpaper blur baked in
+  const sw = Math.max(1, Math.round(cols.total * sc)), sh = Math.max(1, Math.round(rows.total * sc));
+  const src = document.createElement('canvas'); src.width = sw; src.height = sh;
+  const g = src.getContext('2d', { willReadFrequently: true });
+  const f = Math.max(sw / img.width, sh / img.height), dw = img.width * f, dh = img.height * f;
+  const bl = S.wallBlur * sc; if (bl) g.filter = `blur(${bl}px)`;
+  g.drawImage(img, (sw - dw) / 2 - bl * 2, (sh - dh) / 2 - bl * 2, dw + bl * 4, dh + bl * 4);
+  const sd = g.getImageData(0, 0, sw, sh).data;
+  const out = new ImageData(w, h), od = out.data;
+  // light from the upper left, a little in front
+  let Lx = -0.34, Ly = -0.52, Lz = 0.78; { const m = Math.hypot(Lx, Ly, Lz); Lx /= m; Ly /= m; Lz /= m; }
+  let Hx = Lx, Hy = Ly, Hz = Lz + 1; { const m = Math.hypot(Hx, Hy, Hz); Hx /= m; Hy /= m; Hz /= m; }
+  const ks = { matte: 0.08, satin: 0.22, gloss: 0.42 }[S.gloss] ?? 0.22, shin = S.gloss === 'gloss' ? 70 : 34;
+  const specFlat = Math.pow(Hz, shin);
+  const B = 12 * k, D = 4 * k; // band the vinyl stretches over around a well, and how far it gets pulled in
+  let seed = 1234567;
+  for (let j = 0; j < h; j++) {
+    const py = (j + 0.5) / sc, syRow = rows.S[j], nyRoll = rows.N[j], tiltY = 0.07 * ((py - topY) / Hv * 2 - 1);
+    const near = wells.filter(wl => Math.abs(py - wl.cy) < wl.R + B + 2);
+    for (let i = 0; i < w; i++) {
+      const px = (i + 0.5) / sc, nxRoll = cols.N[i];
+      let sx = cols.S[i], sy = syRow, nx = nxRoll + 0.1 * (px / W * 2 - 1), ny = nyRoll + tiltY, mul = 1;
+      // only the closest well bends the vinyl, so neighbouring wells don't stack into ripples
+      let wl = null, d = B;
+      for (const c of near) { if (Math.abs(px - c.cx) > c.R + B + 2) continue; const dc = sdWell(c, px, py); if (dc < d) { d = dc; wl = c; } }
+      if (wl) {
+        const gx = sdWell(wl, px + 0.6, py) - sdWell(wl, px - 0.6, py), gy = sdWell(wl, px, py + 0.6) - sdWell(wl, px, py - 0.6);
+        const gm = Math.hypot(gx, gy) || 1, ux = gx / gm, uy = gy / gm;
+        let pull, slope;
+        if (d > 0) { const t = 1 - d / B, s = t * t * (3 - 2 * t); pull = D * s; slope = 0.9 * Math.sin(t * Math.PI / 2) * s; }
+        else { pull = D + Math.min(-d, 12) * 0.25; slope = 0; mul *= 0.8; }
+        sx += ux * pull; sy += uy * pull; nx -= ux * slope; ny -= uy * slope;
+      }
+      // shading from the bent surface
+      const nz = Math.sqrt(Math.max(0.04, 1 - nx * nx - ny * ny)), m = Math.hypot(nx, ny, nz);
+      const ex = nx / m, ey = ny / m, ez = nz / m;
+      const diff = ex * Lx + ey * Ly + ez * Lz;
+      const edge = Math.sqrt(Math.max(0, 1 - nxRoll * nxRoll)) * Math.sqrt(Math.max(0, 1 - nyRoll * nyRoll));
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      const peel = 1 + ((seed >> 16) / 32768 - 0.5) * 0.035;
+      const shade = Math.max(0.2, (1 + 0.95 * (diff - Lz)) * (0.55 + 0.45 * edge) * mul * peel);
+      const nh = Math.max(0, ex * Hx + ey * Hy + ez * Hz);
+      const spec = 255 * ks * Math.max(0, Math.pow(nh, shin) - specFlat);
+      // bilinear sample of the flat sheet
+      let fx = sx * sc - 0.5, fy = sy * sc - 0.5;
+      fx = fx < 0 ? 0 : fx > sw - 1.001 ? sw - 1.001 : fx; fy = fy < 0 ? 0 : fy > sh - 1.001 ? sh - 1.001 : fy;
+      const x0 = fx | 0, y0 = fy | 0, ax = fx - x0, ay = fy - y0, x1 = Math.min(x0 + 1, sw - 1), y1 = Math.min(y0 + 1, sh - 1);
+      const a = (y0 * sw + x0) * 4, b = (y0 * sw + x1) * 4, c = (y1 * sw + x0) * 4, e = (y1 * sw + x1) * 4, o = (j * w + i) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        const v = (sd[a + ch] * (1 - ax) + sd[b + ch] * ax) * (1 - ay) + (sd[c + ch] * (1 - ax) + sd[e + ch] * ax) * ay;
+        od[o + ch] = v * shade + spec;
+      }
+      od[o + 3] = 255;
+    }
+  }
+  cv.width = w; cv.height = h; cv.getContext('2d').putImageData(out, 0, 0);
+}
+// the in-game body: re-bake when the wallpaper, layout or finish changes
+function refreshVinyl(now) {
+  clearTimeout(_vinylT);
+  if (!now) { _vinylT = setTimeout(() => refreshVinyl(true), 120); return; }
+  if (_pv?.isConnected) refreshPreviewVinyl(_pv);
+  const body = document.getElementById('body'), cv = document.getElementById('vinyl');
+  if (!body || !cv || !vinylOn() || !body.classList.contains('show') || typeof Touch === 'undefined') return;
+  const br = body.getBoundingClientRect(), st = document.getElementById('stage').getBoundingClientRect();
+  const topY = Math.max(0, Math.min(br.height * 0.8, st.bottom - br.top));
+  const wells = wellShapes(body, Object.values(Touch.els));
+  const key = [_wallVer, br.width, br.height, topY, S.vinyl, S.gloss, S.wallBlur, S.btnStyle, devicePixelRatio, JSON.stringify(wells.map(w => [w.cx | 0, w.cy | 0, w.R | 0]))].join('|');
+  if (key === _vinylKey) return;
+  _vinylKey = key;
+  renderVinyl(cv, br.width, br.height, wells, topY).catch(() => {});
+}
+// the little preview in the Look tab
+function refreshPreviewVinyl(pv) {
+  if (!pv || !pv.isConnected || !vinylOn()) return;
+  let cv = pv.querySelector('.pvinyl');
+  if (!cv) { cv = document.createElement('canvas'); cv.className = 'pvinyl'; pv.prepend(cv); }
+  const r = pv.getBoundingClientRect();
+  renderVinyl(cv, r.width, r.height, wellShapes(pv, pv.querySelectorAll('.ctl')), 0).catch(() => {});
+}
 
 /* ============================================================
    Emulation controller
@@ -1670,7 +1833,8 @@ const Emu = {
     this.search = new RamSearch(core);
     this.paused = false; this.userPaused = false; this.acc = 0; this.last = 0; this.playT = performance.now();
     Audio_.flush(); Audio_.apply(S);
-    this.timers = [setInterval(() => this.persistSram(), 2500), setInterval(() => this.autoState(), Math.max(10, S.autoSaveSec) * 1000)];
+    this.autoT = 0; this.autoLast = performance.now(); this._ledN = -1;
+    this.timers = [setInterval(() => this.persistSram(), 2500), setInterval(() => this.autoTick(), 250)];
     this.requestWake();
     cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(t => this.tick(t));
     this.hud();
@@ -1701,6 +1865,25 @@ const Emu = {
     const s = core.sram(); if (!s) return;
     const c = crc32(s); if (c === this.sramCrc) return;
     this.sramCrc = c; await DB.put('saves', this.game.id, s);
+  },
+  // auto snapshot clock: counts play time only, so the lights freeze while paused
+  autoTick() {
+    const now = performance.now(), dt = now - this.autoLast; this.autoLast = now;
+    if (!this.active) return;
+    if (!this.paused) this.autoT += dt;
+    const per = Math.max(10, S.autoSaveSec) * 1000;
+    if (this.autoT >= per) { this.autoT = 0; this.autoState(); this.saveLeds(true); return; }
+    this.saveLeds();
+  },
+  saveLeds(fire) {
+    const box = document.getElementById('saveLeds'); if (!box) return;
+    const on = S.saveLights && S.autoResume;
+    box.classList.toggle('on', on); if (!on) { this._ledN = -1; return; }
+    if (fire) { box.classList.add('fire'); this._ledN = 6; [...box.children].forEach(i => i.classList.add('lit')); clearTimeout(this._fireT); this._fireT = setTimeout(() => { box.classList.remove('fire'); this._ledN = -1; this.saveLeds(); }, 650); return; }
+    if (box.classList.contains('fire')) return;
+    const n = Math.min(5, Math.floor(this.autoT / (Math.max(10, S.autoSaveSec) * 1000) * 6));
+    if (n === this._ledN) return; this._ledN = n;
+    [...box.children].forEach((i, k) => i.classList.toggle('lit', k < n));
   },
   thumb() { try { return frameToCanvas(core.video()).toDataURL('image/jpeg', 0.82); } catch (e) { return null; } },
   async autoState() {
@@ -1843,7 +2026,7 @@ const Emu = {
     if (device && !S.shell) stage.style.paddingTop = 'env(safe-area-inset-top,0px)';
     player.classList.toggle('port', device);
     player.style.setProperty('--stage-h', `calc(${stageH}px + env(safe-area-inset-top,0px))`);
-    const body = $('#body'); body.classList.toggle('show', device);
+    const body = $('#body'); body.classList.toggle('show', device); refreshVinyl();
     renderer.setSize(cw, ch);
     const cy = device ? (stageH - logo) / 2 : H / 2;
     const amb = $('#amb').style; amb.setProperty('--amb-y', (cy / H * 100).toFixed(1) + '%'); amb.setProperty('--amb-w', Math.min(140, cw / W * 100 * 0.85 + 20).toFixed(0) + '%'); amb.setProperty('--amb-h', Math.min(120, ch / H * 100 * 0.9 + 18).toFixed(0) + '%');
@@ -1895,8 +2078,11 @@ const Emu = {
     const cv = $('#screen');
     if (!cv.captureStream || typeof MediaRecorder === 'undefined') return toast('Recording is not supported here');
     const stream = new MediaStream([...cv.captureStream(60).getVideoTracks(), ...Audio_.recordStream().getAudioTracks()]);
-    const type = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(t => MediaRecorder.isTypeSupported(t)) || '';
-    const rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 6e6 } : undefined); const chunks = [];
+    // MP4 (H.264 + AAC) first so clips go straight to WhatsApp and the gallery; older WebViews fall back to WebM
+    // (only with AAC audio: WhatsApp turns down MP4s that carry Opus)
+    const type = ['video/mp4;codecs=avc1.42E01F,mp4a.40.2', 'video/mp4;codecs=avc1.4D401F,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    let rec; try { rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 6e6 } : undefined); } catch (e) { rec = new MediaRecorder(stream); }
+    const chunks = [];
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     rec.onstop = () => { const blob = new Blob(chunks, { type: rec.mimeType }); download(`${safeName(this.game?.name || 'clip')}-${stamp()}.${rec.mimeType.includes('mp4') ? 'mp4' : 'webm'}`, blob); toast('Clip saved'); };
     rec.start(1000); this.rec = rec; $('#hudRec').classList.remove('hidden'); this.updateLed(); toast('Recording. Open the menu to stop.');
@@ -2260,7 +2446,7 @@ const Panels = {
   controls(b) {
     b.append(sec('Touch controls',
       row('Show on screen', null, sel('showTouch', [['auto', 'On touch devices'], ['on', 'Always'], ['off', 'Never']], () => { if (Emu.active) { Touch.build(); Emu.layoutScreen(); } })),
-      row('Opacity', null, rng('ctlOpacity', 0.15, 1, 0.05, () => Emu.active && Touch.build(), v => Math.round(v * 100) + '%')),
+      row('Opacity', null, rng('ctlOpacity', 0.05, 1, 0.05, () => Emu.active && Touch.setOpacity(), v => Math.round(v * 100) + '%')),
       row('Turbo speed', 'Presses per second for TA, TB and turbo keys', sel('turboRate', [[2, '15'], [3, '10'], [4, '7.5'], [6, '5']])),
       h('div', { class: 'btns', style: { marginTop: '8px' } },
         Emu.active ? h('button', { class: 'btn primary small', onclick: () => { Sheet.close(); Touch.startEdit(); } }, 'Edit layout') : null,
@@ -2301,6 +2487,7 @@ const Panels = {
     b.append(sec('Behaviour',
       row('Resume where I left off', 'Saves a snapshot when you leave a game', sw('autoResume')),
       row('Auto snapshot every', null, sel('autoSaveSec', [[15, '15 s'], [30, '30 s'], [60, '1 min'], [300, '5 min']])),
+      row('Auto save lights', 'Green lights on the controller count down to the next snapshot', sw('saveLights', () => Emu.active && Emu.saveLeds())),
       row('Pause when menu opens', null, sw('pauseOnMenu')),
       row('Pause in background', null, sw('pauseHidden')),
       row('Keep screen on', null, sw('wakeLock', v => v ? Emu.requestWake() : Emu.releaseWake())),
@@ -2329,7 +2516,7 @@ const Panels = {
         h('button', { class: 'btn primary', onclick: () => exportBackup(inc.checked) }, 'Export backup'),
         h('button', { class: 'btn', onclick: importBackup }, 'Import backup')),
     ));
-    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> 1.1. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own.` })));
+    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> 1.4. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own.` })));
   },
 };
 
@@ -2341,7 +2528,7 @@ function lookPanel(b) {
   const pv = h('div', { class: 'pv' });
   const mk = (k, x, y, sz, pill) => { const d = CTL_DEFS[k]; const e = h('div', { class: `ctl k-${k}${d.pill ? ' pill' : ''}${d.small ? ' small' : ''}`, 'data-k': k, style: { left: x + '%', top: y + '%', width: sz + 'px', height: (d.pill ? sz * 0.42 : sz) + 'px' } });
     e.append(k === 'dpad' ? dpadEl() : h('div', { class: 'face' }, h('span', { class: 'lbl' }, d.label)));
-    pv.append(e); return e; };
+    e.style.opacity = S.ctlOpacity; pv.append(e); return e; };
   pv.append(h('div', { class: 'pwall' }), h('div', { class: 'shade' }));
   mk('dpad', 22, 50, 104); mk('a', 82, 38, 56); mk('b', 64, 62, 56); mk('select', 36, 88, 60); mk('start', 64, 88, 60);
   pv.addEventListener('pointerdown', e => { const t = e.target.closest('.ctl'); if (!t) return; Audio_.ctx.resume().then(() => feedback()); t.classList.add('press'); if (t.dataset.k === 'dpad') t.firstChild.classList.add('p-right'); });
@@ -2349,6 +2536,7 @@ function lookPanel(b) {
   pv.addEventListener('pointerup', up); pv.addEventListener('pointerleave', up);
   pv.style.touchAction = 'none'; pv.querySelectorAll('.ctl').forEach(c => c.style.pointerEvents = 'auto');
   b.append(sec('Preview', pv, h('div', { class: 'note' }, 'Tap the buttons to feel the current settings')));
+  _pv = pv; requestAnimationFrame(() => refreshPreviewVinyl(pv));
 
   const sw2 = (cls, items, key, render) => { const box = h('div', { class: cls }); const draw = () => { box.innerHTML = ''; for (const it of items) box.append(render(it, S[key] === it[0], () => { S[key] = it[0]; L(); draw(); })); }; draw(); return box; };
   b.append(sec('Appearance',
@@ -2376,16 +2564,19 @@ function lookPanel(b) {
   ));
   const wallThumb = h('span', { class: 'wall-thumb', style: _wallUrl ? { backgroundImage: `url(${_wallUrl})` } : null });
   b.append(sec('Wallpaper',
-    h('div', { class: 'row' }, h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } }, wallThumb, h('div', null, h('div', { class: 't' }, 'Your own picture'), h('div', { class: 'd' }, _wallUrl ? 'Shaded and molded like the real body' : 'Any photo, shaded like molded plastic'))),
+    h('div', { class: 'row' }, h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } }, wallThumb, h('div', null, h('div', { class: 't' }, 'Your own picture'), h('div', { class: 'd' }, _wallUrl ? 'Printed on the body like a vinyl skin' : 'Any photo, wrapped on like a vinyl skin'))),
       h('span', { class: 'btns' }, h('button', { class: 'btn small', onclick: async () => { const [f] = await pickFiles('image/*'); if (!f) return; try { await setWallpaperFromFile(f); Sheet.render(); toast('Wallpaper set'); } catch (e) { toast('Could not read that image'); } } }, _wallUrl ? 'Change' : 'Choose'),
         _wallUrl ? h('button', { class: 'btn small danger', onclick: async () => { await clearWallpaper(); Sheet.render(); } }, 'Remove') : null)),
     _wallUrl ? row('Use wallpaper', null, sw('wall', applyLook)) : null,
+    _wallUrl ? row('Vinyl wrap', 'Bends the picture over the edges and down into the button wells', null) : null,
+    _wallUrl ? chips('vinyl', [['off', 'Flat'], ['soft', 'Vinyl'], ['deep', 'Deep wrap']], applyLook) : null,
     _wallUrl ? row('Dim', null, rng('wallDim', 0, 0.7, 0.05, applyLook, v => Math.round(v * 100) + '%')) : null,
     _wallUrl ? row('Blur', null, rng('wallBlur', 0, 16, 1, applyLook, v => v + ' px')) : null,
   ));
   b.append(sec('Buttons',
     row('Style', null, null), chips('btnStyle', [['console', 'Console'], ['real', 'Realistic'], ['soft', 'Soft'], ['flat', 'Flat'], ['clear', 'Clear']], applyLook),
     row('Press travel', 'How far buttons sink when pressed', null), chips('press', [['none', 'None'], ['subtle', 'Subtle'], ['deep', 'Deep']], applyLook),
+    row('Opacity', 'How see-through the on-screen buttons are', rng('ctlOpacity', 0.05, 1, 0.05, v => { if (Emu.active) Touch.setOpacity(); _pv?.querySelectorAll('.ctl').forEach(c => c.style.opacity = v); }, v => Math.round(v * 100) + '%')),
     row('Show labels', null, sw('labels', applyLook)),
     row('Click sound', 'Plays on every press, separate from game volume', null),
     chips('click', [['off', 'Off'], ['soft', 'Soft tick'], ['clicky', 'Clicky'], ['thock', 'Thock'], ['membrane', 'Membrane']], v => Audio_.ctx.resume().then(() => clickSound(v))),
@@ -2398,7 +2589,8 @@ function lookPanel(b) {
     row('Screen bezel', 'A dark frame around the picture', sw('bezel', applyLook)),
     row('Glass reflection', 'A faint sheen across the screen', sw('glass', applyLook)),
     row('Power LED', 'Green running, amber fast forward, blue rewind, red recording', sw('led', applyLook)),
-    h('div', { class: 'btns', style: { marginTop: '12px' } }, h('button', { class: 'btn small', onclick: () => { for (const k of ['theme', 'accent', 'grid', 'motion', 'skin', 'texture', 'btnStyle', 'press', 'labels', 'click', 'clickVol', 'haptic', 'ambient', 'bezel', 'glass', 'led', 'shell', 'gloss', 'grille', 'decal', 'wallDim', 'wallBlur']) S[k] = DEFAULTS[k]; L(); Sheet.render(); } }, 'Reset look')),
+    row('Auto save lights', S.autoResume ? `Six lights on the left fill up, one every ${+(Math.max(10, S.autoSaveSec) / 6).toFixed(1)} s, until the auto snapshot` : 'Turn on Resume where I left off in System first', sw('saveLights', () => Emu.active && Emu.saveLeds())),
+    h('div', { class: 'btns', style: { marginTop: '12px' } }, h('button', { class: 'btn small', onclick: () => { for (const k of ['theme', 'accent', 'grid', 'motion', 'skin', 'texture', 'btnStyle', 'press', 'labels', 'click', 'clickVol', 'haptic', 'ambient', 'bezel', 'glass', 'led', 'shell', 'gloss', 'grille', 'decal', 'wallDim', 'wallBlur', 'vinyl', 'saveLights']) S[k] = DEFAULTS[k]; L(); Sheet.render(); } }, 'Reset look')),
   ));
 }
 

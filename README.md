@@ -11,11 +11,11 @@ No games are included. Load ROMs you dumped from cartridges you own.
 
 ## Install
 
-Download [Brads_Bullpup_1.3.apk](release/Brads_Bullpup_1.3.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
+Download [Brads_Bullpup_1.4.apk](release/Brads_Bullpup_1.4.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
 
-There's also [Brads_Bullpup_1.3.html](release/Brads_Bullpup_1.3.html?raw=1), the same app as one file you can open in Chrome on a phone or PC.
+There's also [Brads_Bullpup_1.4.html](release/Brads_Bullpup_1.4.html?raw=1), the same app as one file you can open in Chrome on a phone or PC.
 
-It runs on Android 7 and up. New versions install over old ones and keep your games, saves and states, as long as they're signed with the same key.
+It runs on Android 7 and up. New versions install over old ones and keep your games, saves and states, as long as they're signed with the same key. 1.4 is signed with a new key, so coming from 1.3 you need to export a backup in System, uninstall 1.3, install 1.4 and import the backup. Later versions will update over 1.4 normally.
 
 ## What it does
 
@@ -30,10 +30,10 @@ Emulation is mGBA, one of the most accurate GBA emulators around. On top of that
 - Screen shaders (LCD grid, subpixels, scanlines, CRT, DMG green), GBA colour correction and frame blending
 - Audio effects: reverb with 6 rooms, a 3-band EQ, stereo width and a handheld speaker mode
 - Gamepad and keyboard remapping, turbo buttons, and a touch layout editor with separate portrait and landscape layouts
-- Screenshots and video clip recording, saved to Downloads/Bullpup
+- Screenshots and video clip recording, saved to Downloads/Bullpup. Clips are MP4 (H.264 and AAC) on phones that can encode it, so they send straight to WhatsApp, and WebM otherwise
 - A backup file with all saves, states, cheats and settings
 
-The Look tab is where I spent the most time. There are 11 controller skins, 5 button styles, an iOS-style light theme, click sounds and vibration levels, and a power LED that changes colour for fast forward, rewind and recording. You can also use a photo as the body of the controller and it gets shaded like molded plastic. The pixel weapons (bullpup, pistol, revolver, ray gun, water blaster, sniper and a bubble blaster) show up as stickers, a body pattern and placeholder covers.
+The Look tab is where I spent the most time. There are 11 controller skins, 5 button styles, an iOS-style light theme, click sounds and vibration levels, and a power LED that changes colour for fast forward, rewind and recording. You can also use a photo as the body of the controller. With Vinyl wrap on, it's printed on like a skin: the picture rolls over the sides and bottom of the body and stretches down into each button well, lit to match the Finish setting. That's baked into a canvas once per layout, so it costs nothing while you play. Six optional green lights next to the power LED fill up as the next auto snapshot gets closer, and the button opacity slider goes down to 5%. The pixel weapons (bullpup, pistol, revolver, ray gun, water blaster, sniper and a bubble blaster) show up as stickers, a body pattern and placeholder covers.
 
 ## How it's put together
 

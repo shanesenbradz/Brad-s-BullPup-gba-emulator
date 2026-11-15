@@ -343,7 +343,7 @@ const Panels = {
   controls(b) {
     b.append(sec('Touch controls',
       row('Show on screen', null, sel('showTouch', [['auto', 'On touch devices'], ['on', 'Always'], ['off', 'Never']], () => { if (Emu.active) { Touch.build(); Emu.layoutScreen(); } })),
-      row('Opacity', null, rng('ctlOpacity', 0.15, 1, 0.05, () => Emu.active && Touch.build(), v => Math.round(v * 100) + '%')),
+      row('Opacity', null, rng('ctlOpacity', 0.05, 1, 0.05, () => Emu.active && Touch.setOpacity(), v => Math.round(v * 100) + '%')),
       row('Turbo speed', 'Presses per second for TA, TB and turbo keys', sel('turboRate', [[2, '15'], [3, '10'], [4, '7.5'], [6, '5']])),
       h('div', { class: 'btns', style: { marginTop: '8px' } },
         Emu.active ? h('button', { class: 'btn primary small', onclick: () => { Sheet.close(); Touch.startEdit(); } }, 'Edit layout') : null,
@@ -384,6 +384,7 @@ const Panels = {
     b.append(sec('Behaviour',
       row('Resume where I left off', 'Saves a snapshot when you leave a game', sw('autoResume')),
       row('Auto snapshot every', null, sel('autoSaveSec', [[15, '15 s'], [30, '30 s'], [60, '1 min'], [300, '5 min']])),
+      row('Auto save lights', 'Green lights on the controller count down to the next snapshot', sw('saveLights', () => Emu.active && Emu.saveLeds())),
       row('Pause when menu opens', null, sw('pauseOnMenu')),
       row('Pause in background', null, sw('pauseHidden')),
       row('Keep screen on', null, sw('wakeLock', v => v ? Emu.requestWake() : Emu.releaseWake())),
@@ -412,7 +413,7 @@ const Panels = {
         h('button', { class: 'btn primary', onclick: () => exportBackup(inc.checked) }, 'Export backup'),
         h('button', { class: 'btn', onclick: importBackup }, 'Import backup')),
     ));
-    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> 1.1. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own.` })));
+    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> 1.4. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own.` })));
   },
 };
 
@@ -424,7 +425,7 @@ function lookPanel(b) {
   const pv = h('div', { class: 'pv' });
   const mk = (k, x, y, sz, pill) => { const d = CTL_DEFS[k]; const e = h('div', { class: `ctl k-${k}${d.pill ? ' pill' : ''}${d.small ? ' small' : ''}`, 'data-k': k, style: { left: x + '%', top: y + '%', width: sz + 'px', height: (d.pill ? sz * 0.42 : sz) + 'px' } });
     e.append(k === 'dpad' ? dpadEl() : h('div', { class: 'face' }, h('span', { class: 'lbl' }, d.label)));
-    pv.append(e); return e; };
+    e.style.opacity = S.ctlOpacity; pv.append(e); return e; };
   pv.append(h('div', { class: 'pwall' }), h('div', { class: 'shade' }));
   mk('dpad', 22, 50, 104); mk('a', 82, 38, 56); mk('b', 64, 62, 56); mk('select', 36, 88, 60); mk('start', 64, 88, 60);
   pv.addEventListener('pointerdown', e => { const t = e.target.closest('.ctl'); if (!t) return; Audio_.ctx.resume().then(() => feedback()); t.classList.add('press'); if (t.dataset.k === 'dpad') t.firstChild.classList.add('p-right'); });
@@ -432,6 +433,7 @@ function lookPanel(b) {
   pv.addEventListener('pointerup', up); pv.addEventListener('pointerleave', up);
   pv.style.touchAction = 'none'; pv.querySelectorAll('.ctl').forEach(c => c.style.pointerEvents = 'auto');
   b.append(sec('Preview', pv, h('div', { class: 'note' }, 'Tap the buttons to feel the current settings')));
+  _pv = pv; requestAnimationFrame(() => refreshPreviewVinyl(pv));
 
   const sw2 = (cls, items, key, render) => { const box = h('div', { class: cls }); const draw = () => { box.innerHTML = ''; for (const it of items) box.append(render(it, S[key] === it[0], () => { S[key] = it[0]; L(); draw(); })); }; draw(); return box; };
   b.append(sec('Appearance',
@@ -459,16 +461,19 @@ function lookPanel(b) {
   ));
   const wallThumb = h('span', { class: 'wall-thumb', style: _wallUrl ? { backgroundImage: `url(${_wallUrl})` } : null });
   b.append(sec('Wallpaper',
-    h('div', { class: 'row' }, h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } }, wallThumb, h('div', null, h('div', { class: 't' }, 'Your own picture'), h('div', { class: 'd' }, _wallUrl ? 'Shaded and molded like the real body' : 'Any photo, shaded like molded plastic'))),
+    h('div', { class: 'row' }, h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } }, wallThumb, h('div', null, h('div', { class: 't' }, 'Your own picture'), h('div', { class: 'd' }, _wallUrl ? 'Printed on the body like a vinyl skin' : 'Any photo, wrapped on like a vinyl skin'))),
       h('span', { class: 'btns' }, h('button', { class: 'btn small', onclick: async () => { const [f] = await pickFiles('image/*'); if (!f) return; try { await setWallpaperFromFile(f); Sheet.render(); toast('Wallpaper set'); } catch (e) { toast('Could not read that image'); } } }, _wallUrl ? 'Change' : 'Choose'),
         _wallUrl ? h('button', { class: 'btn small danger', onclick: async () => { await clearWallpaper(); Sheet.render(); } }, 'Remove') : null)),
     _wallUrl ? row('Use wallpaper', null, sw('wall', applyLook)) : null,
+    _wallUrl ? row('Vinyl wrap', 'Bends the picture over the edges and down into the button wells', null) : null,
+    _wallUrl ? chips('vinyl', [['off', 'Flat'], ['soft', 'Vinyl'], ['deep', 'Deep wrap']], applyLook) : null,
     _wallUrl ? row('Dim', null, rng('wallDim', 0, 0.7, 0.05, applyLook, v => Math.round(v * 100) + '%')) : null,
     _wallUrl ? row('Blur', null, rng('wallBlur', 0, 16, 1, applyLook, v => v + ' px')) : null,
   ));
   b.append(sec('Buttons',
     row('Style', null, null), chips('btnStyle', [['console', 'Console'], ['real', 'Realistic'], ['soft', 'Soft'], ['flat', 'Flat'], ['clear', 'Clear']], applyLook),
     row('Press travel', 'How far buttons sink when pressed', null), chips('press', [['none', 'None'], ['subtle', 'Subtle'], ['deep', 'Deep']], applyLook),
+    row('Opacity', 'How see-through the on-screen buttons are', rng('ctlOpacity', 0.05, 1, 0.05, v => { if (Emu.active) Touch.setOpacity(); _pv?.querySelectorAll('.ctl').forEach(c => c.style.opacity = v); }, v => Math.round(v * 100) + '%')),
     row('Show labels', null, sw('labels', applyLook)),
     row('Click sound', 'Plays on every press, separate from game volume', null),
     chips('click', [['off', 'Off'], ['soft', 'Soft tick'], ['clicky', 'Clicky'], ['thock', 'Thock'], ['membrane', 'Membrane']], v => Audio_.ctx.resume().then(() => clickSound(v))),
@@ -481,7 +486,8 @@ function lookPanel(b) {
     row('Screen bezel', 'A dark frame around the picture', sw('bezel', applyLook)),
     row('Glass reflection', 'A faint sheen across the screen', sw('glass', applyLook)),
     row('Power LED', 'Green running, amber fast forward, blue rewind, red recording', sw('led', applyLook)),
-    h('div', { class: 'btns', style: { marginTop: '12px' } }, h('button', { class: 'btn small', onclick: () => { for (const k of ['theme', 'accent', 'grid', 'motion', 'skin', 'texture', 'btnStyle', 'press', 'labels', 'click', 'clickVol', 'haptic', 'ambient', 'bezel', 'glass', 'led', 'shell', 'gloss', 'grille', 'decal', 'wallDim', 'wallBlur']) S[k] = DEFAULTS[k]; L(); Sheet.render(); } }, 'Reset look')),
+    row('Auto save lights', S.autoResume ? `Six lights on the left fill up, one every ${+(Math.max(10, S.autoSaveSec) / 6).toFixed(1)} s, until the auto snapshot` : 'Turn on Resume where I left off in System first', sw('saveLights', () => Emu.active && Emu.saveLeds())),
+    h('div', { class: 'btns', style: { marginTop: '12px' } }, h('button', { class: 'btn small', onclick: () => { for (const k of ['theme', 'accent', 'grid', 'motion', 'skin', 'texture', 'btnStyle', 'press', 'labels', 'click', 'clickVol', 'haptic', 'ambient', 'bezel', 'glass', 'led', 'shell', 'gloss', 'grille', 'decal', 'wallDim', 'wallBlur', 'vinyl', 'saveLights']) S[k] = DEFAULTS[k]; L(); Sheet.render(); } }, 'Reset look')),
   ));
 }
 

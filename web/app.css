@@ -393,3 +393,24 @@ textarea{width:100%;background:var(--raised);border:0;border-radius:10px;padding
 .pv .pwall{display:none;background:var(--wall-url) center/cover}
 [data-wall=on] .pv .pwall{display:block}
 .pv .ctl{z-index:1}
+
+/* ---------- auto save countdown lights ---------- */
+.save-leds{position:absolute;left:7%;top:calc(var(--stage-h) + 18px);display:none;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;background:var(--well);box-shadow:inset 0 2px 4px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.14);z-index:1}
+#player.port .save-leds.on{display:flex}
+.save-leds i{width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.16),rgba(255,255,255,0) 45%),#0b0c0e;box-shadow:inset 0 1px 2px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.08);transition:background-color .35s var(--ease),box-shadow .35s var(--ease)}
+.save-leds i.lit{background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.55),rgba(255,255,255,0) 45%),#5bd68a;box-shadow:0 0 6px rgba(91,214,138,.75),inset 0 -1px 1px rgba(0,60,25,.35)}
+.save-leds.fire i{animation:ledfire .65s var(--ease)}
+@keyframes ledfire{0%,100%{filter:brightness(1)}30%{filter:brightness(1.6);box-shadow:0 0 10px rgba(120,240,165,.95)}}
+
+/* ---------- vinyl wrap wallpaper ---------- */
+#vinyl{position:absolute;left:0;top:0;width:100%;height:100%;display:none}
+[data-wall=on][data-vinyl=on] #vinyl{display:block}
+[data-wall=on][data-vinyl=on] #wall{display:none}
+.pv .pvinyl{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;display:none}
+[data-wall=on][data-vinyl=on] .pv .pvinyl{display:block}
+[data-wall=on][data-vinyl=on] .pv .pwall{display:none}
+/* laminate: a soft sheen streak and a hint of orange peel on top of the print */
+[data-wall=on][data-vinyl=on] :is(#shade,.pv .shade):after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(118deg,rgba(255,255,255,0) 18%,rgba(255,255,255,.07) 27%,rgba(255,255,255,0) 36%,rgba(255,255,255,0) 64%,rgba(255,255,255,.04) 70%,rgba(255,255,255,0) 76%)}
+[data-wall=on][data-vinyl=on][data-gloss=matte] :is(#shade,.pv .shade):after{opacity:.35}
+[data-wall=on][data-vinyl=on][data-btn=console] .ctl:not([data-k=dpad]):before{box-shadow:inset 0 3px 6px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.18)}
