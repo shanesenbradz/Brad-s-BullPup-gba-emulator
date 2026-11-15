@@ -1,0 +1,34 @@
+#!/bin/bash
+# Builds dist/Brads_Bullpup.apk from dist/Brads_Bullpup.html without Android Studio.
+# Needs: Java 17+, Node/npm (to fetch the toolchain), Python 3, zip.
+# Signing: set KEYSTORE, KS_PASS and KS_ALIAS to use your own key. Without them a new key
+# is made in keys/ (git-ignored). Updates only install over a build signed with the same key.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
+TC=.toolchain; B=build
+VC=${VC:-4}; VN=${VN:-1.3}
+if [ ! -d $TC/minapk ]; then
+  mkdir -p $TC && (cd $TC && npm pack @drxiaozhi/minapk@0.5.1 aaptjs3@2.0.2 >/dev/null)
+  mkdir -p $TC/minapk $TC/aapt && tar xzf $TC/drxiaozhi-minapk-*.tgz -C $TC/minapk && tar xzf $TC/aaptjs3-*.tgz -C $TC/aapt
+fi
+T=$TC/minapk/package/tools; AJ=$T/android.jar
+case "$(uname -s)" in Darwin) AAPT2=$TC/aapt/package/bin/x64/darwin/aapt2;; *) AAPT2=$TC/aapt/package/bin/x64/linux/aapt2;; esac
+chmod +x "$AAPT2"
+[ -f dist/Brads_Bullpup.html ] || python3 tools/bundle.py
+rm -rf $B; mkdir -p $B/assets $B/classes $B/dex
+cp dist/Brads_Bullpup.html $B/assets/index.html
+"$AAPT2" compile --dir android/res -o $B/res.zip
+"$AAPT2" link -I $AJ --manifest android/AndroidManifest.xml -o $B/base.apk -A $B/assets \
+  --min-sdk-version 24 --target-sdk-version 33 --version-code $VC --version-name $VN --java $B/gen $B/res.zip
+# ecj, because d8 8.2 rejects the MethodParameters attribute newer javac versions emit
+java -jar $T/ecj-3.45.0.jar -8 -nowarn -cp $AJ -d $B/classes $(find android/src $B/gen -name '*.java')
+java -cp $T/d8.jar com.android.tools.r8.D8 --release --min-api 24 --lib $AJ --output $B/dex $(find $B/classes -name '*.class')
+cp $B/base.apk $B/unaligned.apk && (cd $B/dex && zip -q -X ../unaligned.apk classes.dex)
+python3 -m pip show repro-apk >/dev/null 2>&1 || python3 -m pip install -q repro-apk
+python3 -m repro_apk.zipalign 4 $B/unaligned.apk $B/aligned.apk
+if [ -z "${KEYSTORE:-}" ]; then
+  KEYSTORE=keys/bullpup.jks; KS_PASS=${KS_PASS:-changeit}; KS_ALIAS=${KS_ALIAS:-bullpup}
+  [ -f $KEYSTORE ] || { mkdir -p keys; keytool -genkeypair -keystore $KEYSTORE -storepass $KS_PASS -keypass $KS_PASS -alias $KS_ALIAS -keyalg RSA -keysize 2048 -validity 36500 -dname "CN=Brad's Bullpup"; }
+fi
+java -jar $T/apksigner.jar sign --ks "$KEYSTORE" --ks-pass pass:$KS_PASS --ks-key-alias $KS_ALIAS --key-pass pass:$KS_PASS --min-sdk-version 24 --out dist/Brads_Bullpup.apk $B/aligned.apk
+java -jar $T/apksigner.jar verify dist/Brads_Bullpup.apk && echo "dist/Brads_Bullpup.apk is signed and ready"

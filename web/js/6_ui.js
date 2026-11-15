@@ -1,0 +1,539 @@
+/* ============================================================
+   Dialogs
+   ============================================================ */
+function dialog({ title, body, input, buttons = [{ label: 'OK', value: true, primary: true }], dismiss = null, build, wide = false, sheet = false }) {
+  return new Promise(res => {
+    const wrap = $('#dlgWrap'), d = $('#dlg'); d.innerHTML = '';
+    wrap.classList.toggle('as', sheet); d.classList.toggle('wide', wide);
+    let inp;
+    const close = v => { wrap.classList.add('hidden'); wrap.onclick = null; res(v); };
+    if (title) d.append(h('h4', null, title));
+    if (body) d.append(typeof body === 'string' ? h('div', { class: 'body', html: body }) : body);
+    if (build) build(d, close);
+    if (input !== undefined) { inp = h('input', { class: 'inp', value: input }); d.append(inp); setTimeout(() => { inp.focus(); inp.select(); }, 30); inp.onkeydown = e => { if (e.key === 'Enter') close(inp.value); }; }
+    if (buttons.length) d.append(h('div', { class: 'acts' }, buttons.map(b => h('button', { class: 'btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : ''), onclick: () => close(b.value === '__input' ? inp.value : b.value) }, b.label))));
+    wrap.classList.remove('hidden');
+    wrap.onclick = e => { if (e.target === wrap) close(dismiss); };
+  });
+}
+const confirmD = (title, body, ok = 'OK', danger = false) => dialog({ title, body, buttons: [{ label: 'Cancel', value: false }, { label: ok, value: true, primary: !danger, danger }] });
+const promptD = (title, value = '') => dialog({ title, input: value, buttons: [{ label: 'Cancel', value: null }, { label: 'Save', value: '__input', primary: true }] });
+const menuD = (title, items) => dialog({
+  sheet: true, buttons: [], build: (d, close) => d.append(
+    h('div', { class: 'as-group' }, h('div', { class: 'as-title' }, title), h('div', { class: 'menu-list' }, items.map(it => h('button', { class: it.danger ? 'danger' : '', onclick: () => close(it.k) }, it.label)))),
+    h('button', { class: 'as-cancel', onclick: () => close(null) }, 'Cancel')),
+});
+
+/* ============================================================
+   Views
+   ============================================================ */
+function showView(v) {
+  $('#library').classList.toggle('hidden', v !== 'library');
+  $('#player').classList.toggle('hidden', v !== 'player');
+  if (v === 'player') history.pushState({ p: 1 }, '');
+}
+addEventListener('popstate', () => {
+  if (!Emu.active) return;
+  if (!$('#dlgWrap').classList.contains('hidden')) { $('#dlgWrap').click(); history.pushState({ p: 1 }, ''); return; }
+  if (Touch.editing) { Touch.endEdit(); history.pushState({ p: 1 }, ''); return; }
+  if (!$('#sheet').classList.contains('hidden')) { Sheet.close(); history.pushState({ p: 1 }, ''); return; }
+  Emu.stop();
+});
+
+/* ============================================================
+   Library
+   ============================================================ */
+const Library = {
+  list: [],
+  init() {
+    $('#btnAdd').onclick = $('#btnAdd2').onclick = () => this.pickAndAdd();
+    $('#btnSettings').onclick = () => Sheet.open('look');
+    $('#library').addEventListener('scroll', () => $('#libHead').classList.toggle('scrolled', $('#library').scrollTop > 44), { passive: true });
+    $('#search').oninput = () => this.render();
+    $('#sort').value = localStorage.getItem('calzone.sort') || 'recent';
+    $('#sort').onchange = () => { localStorage.setItem('calzone.sort', $('#sort').value); this.render(); };
+    addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('dragging'); });
+    addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('dragging'); });
+    addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('dragging'); if (!Emu.active) this.addFiles([...e.dataTransfer.files]); });
+    this.render();
+  },
+  async pickAndAdd() { const f = await pickFiles('.gba,.gb,.gbc,.sgb,.agb,.zip,.bin', true); this.addFiles(f); },
+  async addFiles(files) {
+    let added = 0, last = null;
+    for (const f of files) {
+      try {
+        let bytes = await readBytes(f), name = f.name;
+        if (isZip(bytes)) ({ name, bytes } = await unzipFirst(bytes, ROM_EXT));
+        const sys = detectSystem(bytes, name);
+        if (!sys) { toast(`${f.name} does not look like a GB or GBA ROM`); continue; }
+        const crc = crc32(bytes), id = hex(crc) + '-' + bytes.length;
+        if (await DB.get('meta', id)) { toast(`${cleanName(name)} is already in your library`); continue; }
+        const hd = romHeaderTitle(bytes, sys);
+        const meta = { id, name: cleanName(name) || hd.title || 'Untitled', file: name, system: sys, size: bytes.length, crc: hex(crc), code: hd.code, title: hd.title, added: Date.now(), lastPlayed: 0, playSec: 0, thumb: null };
+        await DB.put('roms', id, bytes); await DB.put('meta', id, meta); added++; last = meta;
+      } catch (e) { toast(`${f.name}: ${e.message}`); }
+    }
+    if (added) { toast(added === 1 ? `Added ${last.name}` : `Added ${added} games`); navigator.storage?.persist?.(); }
+    this.render();
+  },
+  async render() {
+    this.list = await DB.all('meta');
+    const q = $('#search').value.trim().toLowerCase(), sort = $('#sort').value;
+    let L = this.list.filter(m => !q || m.name.toLowerCase().includes(q) || (m.title || '').toLowerCase().includes(q));
+    const by = { recent: (a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || b.added - a.added, name: (a, b) => a.name.localeCompare(b.name), added: (a, b) => b.added - a.added, time: (a, b) => (b.playSec || 0) - (a.playSec || 0) }[sort];
+    L.sort(by);
+    const g = $('#games'); g.innerHTML = '';
+    $('#empty').classList.toggle('show', !this.list.length);
+    const shelf = $('#shelf'); if (shelf && !shelf.childElementCount) for (const [k, w] of [['pistol', 30], ['raygun', 42], ['soaker', 48], ['revolver', 38], ['bubble', 32]]) shelf.append(h('span', { style: { width: w + 'px' }, html: SPRITES[k] }));
+    $('.lib-tools').style.display = this.list.length ? '' : 'none';
+    for (const m of L) {
+      const cover = h('div', { class: 'cover', style: m.thumb ? { backgroundImage: `url(${m.thumb})` } : null },
+        m.thumb ? null : h('span', { class: 'placeholder', html: spriteFor(m.id) }),
+        h('span', { class: 'badge' }, m.system.toUpperCase()));
+      const more = h('button', { class: 'more', 'aria-label': 'Options for ' + m.name, html: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>', onclick: e => { e.stopPropagation(); this.cardMenu(m); } });
+      g.append(h('div', { class: 'card', role: 'button', tabindex: 0, onclick: () => Emu.start(m), onkeydown: e => { if (e.key === 'Enter') Emu.start(m); } }, cover,
+        h('div', { class: 'meta' }, h('div', null, h('div', { class: 'name', title: m.name }, m.name), h('div', { class: 'sub' }, m.lastPlayed ? `${fmtTime(m.playSec)}  ·  ${fmtAgo(m.lastPlayed)}` : 'Not played yet')), more)));
+    }
+    const est = await navigator.storage?.estimate?.().catch(() => null);
+    $('#libFoot').textContent = `${this.list.length} game${this.list.length === 1 ? '' : 's'}${est ? `  ·  ${fmtBytes(est.usage || 0)} on this phone` : ''}  ·  mGBA core`;
+  },
+  async cardMenu(m) {
+    const k = await menuD(m.name, [
+      { k: 'play', label: 'Play' }, { k: 'rename', label: 'Rename' }, { k: 'patch', label: 'Apply a patch (IPS, UPS, BPS)' },
+      { k: 'isav', label: 'Import save file (.sav)' }, { k: 'esav', label: 'Export save file (.sav)' }, { k: 'erom', label: 'Export ROM' },
+      { k: 'info', label: 'Details' }, { k: 'del', label: 'Delete from library', danger: true },
+    ]);
+    if (k === 'play') Emu.start(m);
+    if (k === 'rename') { const n = await promptD('Rename', m.name); if (n && n.trim()) { m.name = n.trim(); await DB.put('meta', m.id, m); this.render(); } }
+    if (k === 'patch') {
+      const [f] = await pickFiles('.ips,.ups,.bps'); if (!f) return;
+      try {
+        const out = applyPatch(await DB.get('roms', m.id), await readBytes(f));
+        const crc = crc32(out), id = hex(crc) + '-' + out.length;
+        const meta = { ...m, id, name: m.name + ' [' + cleanName(f.name) + ']', crc: hex(crc), size: out.length, added: Date.now(), lastPlayed: 0, playSec: 0, thumb: null };
+        await DB.put('roms', id, out); await DB.put('meta', id, meta); toast('Patched copy added'); this.render();
+      } catch (e) { toast(e.message); }
+    }
+    if (k === 'isav') { const [f] = await pickFiles('.sav,.srm,.bin'); if (f) { await DB.put('saves', m.id, await readBytes(f)); await DB.del('states', m.id + ':auto'); toast('Save imported'); } }
+    if (k === 'esav') { const s = await DB.get('saves', m.id); s ? download(safeName(m.name) + '.sav', s) : toast('No save data yet'); }
+    if (k === 'erom') { const r = await DB.get('roms', m.id); download(m.file || safeName(m.name) + '.' + (m.system === 'gba' ? 'gba' : m.system), r); }
+    if (k === 'info') dialog({ wide: true, title: m.name, body: `<div class="note">System: <b>${m.system.toUpperCase()}</b><br>Header title: <b>${m.title || '-'}</b> ${m.code ? `(${m.code})` : ''}<br>CRC32: <b>${m.crc}</b><br>Size: <b>${fmtBytes(m.size)}</b><br>Play time: <b>${fmtTime(m.playSec)}</b><br>Added: <b>${new Date(m.added).toLocaleString()}</b></div>` });
+    if (k === 'del' && await confirmD('Delete ' + m.name + '?', 'This removes the ROM, its save data, save states and cheats from this phone.', 'Delete', true)) {
+      await DB.del('roms', m.id); await DB.del('meta', m.id); await DB.del('saves', m.id); await DB.del('cheats', m.id); await DB.delPrefix('states', m.id + ':');
+      this.render();
+    }
+  },
+};
+
+/* ============================================================
+   Menu sheet
+   ============================================================ */
+const sw = (key, on) => { const i = h('input', { type: 'checkbox' }); i.checked = !!S[key]; i.onchange = () => { S[key] = i.checked; saveSettings(); on && on(i.checked); }; return h('label', { class: 'switch' }, i, h('i')); };
+const swRaw = (val, on) => { const i = h('input', { type: 'checkbox' }); i.checked = !!val; i.onchange = () => on(i.checked); return h('label', { class: 'switch' }, i, h('i')); };
+const sel = (key, opts, on) => { const s = h('select', null, opts.map(([v, l]) => h('option', { value: v }, l))); s.value = String(S[key]); s.onchange = () => { const v = s.value; S[key] = isNaN(+v) || v === '' ? v : +v; saveSettings(); on && on(S[key]); }; return s; };
+const rng = (key, min, max, step, on, fmt = v => v) => {
+  const out = h('span', { class: 'val' }, fmt(S[key]));
+  const r = h('input', { type: 'range', min, max, step }); r.value = S[key];
+  r.oninput = () => { S[key] = +r.value; out.textContent = fmt(S[key]); saveSettings(); on && on(S[key]); };
+  return h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', width: '55%', justifyContent: 'flex-end' } }, r, out);
+};
+const row = (t, d, ctl) => h('div', { class: 'row' + (ctl ? '' : ' head') }, h('div', null, h('div', { class: 't' }, t), d ? h('div', { class: 'd' }, d) : null), ctl);
+const sec = (title, ...kids) => {
+  const box = h('div', { class: 'sec' }, title ? h('h3', null, title) : null); let grp = null;
+  for (const k of kids.flat()) {
+    if (!k) continue;
+    if (k.classList && (k.classList.contains('note') || k.classList.contains('btns') || k.classList.contains('bare') || k.classList.contains('btn'))) { grp = null; box.append(k); continue; }
+    if (!grp) { grp = h('div', { class: 'group' }); box.append(grp); }
+    grp.append(k);
+  }
+  return box;
+};
+const chips = (key, opts, on) => {
+  const box = h('div', { class: 'chips' });
+  const draw = () => { box.innerHTML = ''; for (const [v, l] of opts) box.append(h('button', { class: 'chip' + (S[key] === v ? ' act' : ''), onclick: () => { S[key] = v; saveSettings(); draw(); on && on(v); } }, l)); };
+  draw(); return box;
+};
+const applyAudio = () => Audio_.apply(S);
+const redraw = () => { if (Emu.active) { Emu.layoutScreen(); } };
+
+const Sheet = {
+  tab: 'game',
+  tabs() { return Emu.active ? [['game', 'Game'], ['cheats', 'Cheats'], ['look', 'Look'], ['audio', 'Audio'], ['controls', 'Input'], ['system', 'System']] : [['look', 'Look'], ['audio', 'Audio'], ['controls', 'Input'], ['system', 'System']]; },
+  init() { $('#sheetClose').onclick = () => this.close(); $('#scrim').onclick = () => this.close(); },
+  get isOpen() { return !$('#sheet').classList.contains('hidden'); },
+  toggle() { this.isOpen ? this.close() : this.open(); },
+  open(tab) {
+    if (tab) this.tab = tab; if (!this.tabs().some(t => t[0] === this.tab)) this.tab = this.tabs()[0][0];
+    if (Emu.active && S.pauseOnMenu) { this._paused = !Emu.paused; Emu.pause(true); }
+    $('#sheet').classList.remove('hidden'); $('#scrim').classList.remove('hidden');
+    $('#sheetTitle').textContent = Emu.active ? Emu.game.name : 'Settings';
+    $('#sheetSub').textContent = Emu.active ? `${Emu.game.system.toUpperCase()}  ·  SN ${Emu.game.crc}  ·  ${Emu.game.playSec >= 1 ? fmtTime(Emu.game.playSec) : 'first session'}` : 'Applies to every game';
+    this.render();
+  },
+  close() {
+    $('#sheet').classList.add('hidden'); $('#scrim').classList.add('hidden');
+    if (Emu.active && this._paused && !Emu.userPaused) Emu.pause(false); this._paused = false;
+    if (!Emu.active) Library.render();
+  },
+  refreshIf(t) { if (this.isOpen && this.tab === t) this.render(); },
+  render() {
+    const nav = $('#tabs'); nav.innerHTML = '';
+    for (const [k, l] of this.tabs()) nav.append(h('button', { class: k === this.tab ? 'act' : '', onclick: () => { this.tab = k; this.render(); } }, l));
+    const b = $('#sheetBody'); const top = b.scrollTop; b.innerHTML = '';
+    Panels[this.tab](b);
+    b.scrollTop = top;
+  },
+};
+
+const Panels = {
+  /* ---------------- GAME ---------------- */
+  async game(b) {
+    const g = Emu.game;
+    b.append(sec(null, h('div', { class: 'btns' },
+      h('button', { class: 'btn primary', onclick: () => { Emu.userPaused = false; Sheet._paused = true; Sheet.close(); } }, 'Resume'),
+      h('button', { class: 'btn', onclick: async () => { if (await confirmD('Reset the game?', 'Unsaved progress since your last in-game save is lost. Your save file is kept.', 'Reset')) { Emu.reset(); Sheet.close(); } } }, 'Reset'),
+      h('button', { class: 'btn', onclick: () => { Sheet.close(); Emu.stop(); } }, 'Exit to library'),
+    )));
+    // speed
+    b.append(sec('Speed',
+      row('Fast forward', 'Also on the >> button, Space or R2', swRaw(Emu.ffToggle, () => Emu.hotkey('ff_toggle'))),
+      chips('ffSpeed', [[1.5, '1.5x'], [2, '2x'], [3, '3x'], [4, '4x'], [6, '6x'], [8, '8x'], [12, '12x']], () => Emu.hud()),
+      row('Slow motion', 'Audio slows down with it', swRaw(Emu.slow, v => { Emu.slow = v; Emu.hud(); })),
+      chips('slowSpeed', [[0.25, '0.25x'], [0.5, '0.5x'], [0.75, '0.75x']]),
+    ));
+    // states
+    const slots = h('div', { class: 'slots' });
+    const recs = {};
+    for (let n = 1; n <= 9; n++) recs[n] = await DB.get('states', g.id + ':' + n);
+    const auto = await DB.get('states', g.id + ':auto');
+    for (let n = 1; n <= 9; n++) {
+      const r = recs[n];
+      slots.append(h('div', { class: 'slot' + (S.slot === n ? ' sel' : ''), onclick: () => { S.slot = n; saveSettings(); Sheet.render(); } },
+        h('div', { class: 'img', style: r?.thumb ? { backgroundImage: `url(${r.thumb})` } : null }, r ? '' : 'Empty'),
+        h('span', { class: 'n' }, String(n).padStart(2, '0')), h('div', { class: 'cap' }, r ? fmtAgo(r.time) : '-')));
+    }
+    const cur = recs[S.slot];
+    b.append(sec(`Save states  ·  slot ${String(S.slot).padStart(2, '0')}`, slots, h('div', { class: 'btns', style: { marginTop: '12px' } },
+      h('button', { class: 'btn primary', onclick: () => Emu.saveSlot(S.slot) }, 'Save here'),
+      h('button', { class: 'btn', disabled: !cur, onclick: async () => { await Emu.loadSlot(S.slot); Sheet.close(); } }, 'Load'),
+      h('button', { class: 'btn', disabled: !cur, onclick: () => download(`${safeName(g.name)}.ss${S.slot}`, cur.data) }, 'Export'),
+      h('button', { class: 'btn', onclick: async () => { const [f] = await pickFiles('*'); if (!f) return; const d = await readBytes(f); if (d.length !== core.stateSize) return toast('That state is for a different game or core'); await DB.put('states', g.id + ':' + S.slot, { data: d, thumb: null, time: Date.now() }); Sheet.render(); } }, 'Import'),
+      h('button', { class: 'btn danger', disabled: !cur, onclick: async () => { await DB.del('states', g.id + ':' + S.slot); Sheet.render(); } }, 'Delete'),
+    ), h('div', { class: 'btns', style: { marginTop: '8px' } },
+      h('button', { class: 'btn small', disabled: !Emu.undoLoad, onclick: () => { Emu.undoLoadState(); Sheet.render(); } }, 'Undo last load'),
+      h('button', { class: 'btn small', disabled: !Emu.undoSave, onclick: () => Emu.undoSaveState() }, 'Undo last save'),
+      h('button', { class: 'btn small', disabled: !auto, onclick: async () => { Emu.undoLoad = core.saveState(); core.loadState(auto.data); Emu.afterStateJump(); Sheet.close(); toast('Loaded auto save'); } }, auto ? `Load auto save (${fmtAgo(auto.time)})` : 'No auto save yet'),
+    )));
+    // tools
+    b.append(sec('Tools', h('div', { class: 'btns' },
+      h('button', { class: 'btn', onclick: () => Emu.screenshot() }, 'Screenshot'),
+      h('button', { class: 'btn' + (Emu.rec ? ' on' : ''), onclick: () => { Emu.toggleRecording(); Sheet.render(); } }, Emu.rec ? 'Stop recording' : 'Record clip'),
+      h('button', { class: 'btn', onclick: () => { Sheet.close(); Emu.hotkey('step'); toast('Paused. Use N or Frame advance to step'); } }, 'Frame advance'),
+      window.CalzoneAndroid ? null : h('button', { class: 'btn', onclick: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => toast('Fullscreen not available')); } }, 'Fullscreen'),
+      h('button', { class: 'btn', onclick: () => { Sheet.close(); Touch.startEdit(); } }, 'Edit touch layout'),
+    )));
+    b.append(sec('Battery save', h('div', { class: 'note', style: { marginBottom: '12px' } }, 'In-game saves are stored automatically every few seconds.'), h('div', { class: 'btns' },
+      h('button', { class: 'btn', onclick: async () => { await Emu.persistSram(); const s = core.sram(); s ? download(safeName(g.name) + '.sav', s) : toast('This game has no save memory'); } }, 'Export .sav'),
+      h('button', { class: 'btn', onclick: async () => { const [f] = await pickFiles('.sav,.srm,.bin'); if (!f) return; if (!await confirmD('Replace save data?', 'The game will reset to load the imported save.', 'Import', true)) return; const d = await readBytes(f); core.loadSram(d, Emu.rom); await DB.put('saves', g.id, d); Emu.sramCrc = crc32(d); Emu.reset(); } }, 'Import .sav'),
+    )));
+  },
+
+  /* ---------------- CHEATS ---------------- */
+  cheats(b) {
+    if (!core.hasMem) { b.append(sec('Cheats', h('div', { class: 'note' }, 'Cheats and RAM search are available for Game Boy Advance games.'))); return; }
+    const list = h('div');
+    const drawList = () => {
+      list.innerHTML = '';
+      if (!Emu.cheats.length) list.append(h('div', { class: 'note' }, 'No cheats yet. Add a code below or find your own with the RAM search.'));
+      Emu.cheats.forEach((c, i) => {
+        const t = h('input', { type: 'checkbox' }); t.checked = c.on; t.onchange = () => { c.on = t.checked; Emu.saveCheats().then(drawList); };
+        list.append(h('div', { class: 'cheat' }, h('label', { class: 'switch' }, t, h('i')),
+          h('div', { class: 'info' }, h('div', { class: 'nm' }, c.name), h('div', { class: 'cd' }, c.code.replace(/\n/g, '  ')), c.errors?.length ? h('div', { class: 'err' }, c.errors[0]) : h('div', { class: 'd note' }, { raw: 'Raw', cb: 'CodeBreaker', gs1: 'GameShark v1/v2', ar3: 'Action Replay v3', auto: '' }[c.detected] || '')),
+          h('button', { class: 'btn small', onclick: () => editCheat(c, i) }, 'Edit')));
+      });
+    };
+    const editCheat = async (c, i) => {
+      const name = h('input', { value: c?.name || '' }), code = h('textarea', { rows: 5, placeholder: 'One code per line\nRaw: 02001234:63\nCodeBreaker: 82001234 03E7\nGameShark / Action Replay: XXXXXXXX YYYYYYYY' }); code.value = c?.code || '';
+      const fmt = h('select', null, [['auto', 'Detect automatically'], ['raw', 'Raw address:value'], ['cb', 'CodeBreaker'], ['gs1', 'GameShark v1/v2'], ['ar3', 'Action Replay v3']].map(([v, l]) => h('option', { value: v }, l))); fmt.value = c?.fmt || 'auto';
+      const r = await dialog({ wide: true, title: c ? 'Edit cheat' : 'Add cheat', build: d => d.append(h('label', { class: 'field' }, h('span', null, 'Name'), name), h('label', { class: 'field' }, h('span', null, 'Code'), code), h('label', { class: 'field' }, h('span', null, 'Format'), fmt)),
+        buttons: [...(c ? [{ label: 'Delete', value: 'del', danger: true }] : []), { label: 'Cancel', value: null }, { label: 'Save', value: 'ok', primary: true }] });
+      if (r === 'del') Emu.cheats.splice(i, 1);
+      else if (r === 'ok' && code.value.trim()) {
+        const rec = { name: name.value.trim() || 'Cheat', code: code.value.trim(), fmt: fmt.value, on: c ? c.on : true };
+        c ? Emu.cheats.splice(i, 1, rec) : Emu.cheats.push(rec);
+      } else return;
+      await Emu.saveCheats(); drawList();
+    };
+    drawList();
+    b.append(sec('Active cheats', list, h('div', { class: 'btns', style: { marginTop: '12px' } }, h('button', { class: 'btn primary', onclick: () => editCheat(null) }, 'Add cheat'))));
+
+    // RAM search
+    const rs = Emu.search; const res = h('div', { class: 'res' }); const val = h('input', { type: 'number', placeholder: 'value', style: { width: '110px' } });
+    const bits = h('select', null, [[8, '8-bit'], [16, '16-bit'], [32, '32-bit']].map(([v, l]) => h('option', { value: v }, l))); bits.value = rs.bits;
+    bits.onchange = () => { rs.reset(+bits.value); drawRes(); };
+    const info = h('div', { class: 'note' });
+    const drawRes = () => {
+      res.innerHTML = '';
+      info.innerHTML = !rs.addrs ? 'Start a search, play a little, then narrow it down. Example: note your health, take a hit, choose <b>Equals</b> with the new value.' : `<b>${rs.count.toLocaleString()}</b> candidate address${rs.count === 1 ? '' : 'es'} after ${rs.history} pass${rs.history === 1 ? '' : 'es'}`;
+      if (!rs.addrs || rs.count > 300) return;
+      for (let i = 0; i < Math.min(rs.count, 60); i++) {
+        const a = rs.addrs[i], v = rs.read(a);
+        res.append(h('div', { class: 'r' }, h('span', null, hex(a)), h('span', null, `${v}  (0x${v.toString(16).toUpperCase()})`), h('span', { class: 'btns' },
+          h('button', { class: 'btn small', onclick: async () => { const n = await promptD('Write a new value', String(rs.read(a))); if (n == null || n === '') return; const x = +n >>> 0; rs.bits === 8 ? core.w8(a, x) : rs.bits === 16 ? core.w16(a, x) : core.w32(a, x); toast('Written'); drawRes(); } }, 'Set'),
+          h('button', { class: 'btn small', onclick: async () => { const n = await promptD('Lock this address to', String(rs.read(a))); if (n == null || n === '') return; const x = +n >>> 0; Emu.cheats.push({ name: 'Lock ' + hex(a), code: `${hex(a)}:${hex(x, rs.bits / 4)}`, fmt: 'raw', on: true }); await Emu.saveCheats(); drawList(); toast('Locked'); } }, 'Lock'))));
+      }
+    };
+    const f = (mode, needVal) => () => { if (needVal && val.value === '') return toast('Enter a value first'); const n = rs.filter(mode, +val.value); drawRes(); if (!n) toast('No matches. Start a new search.'); };
+    drawRes();
+    b.append(sec('RAM search',
+      h('div', { class: 'btns search-row', style: { marginBottom: '12px' } }, bits, h('button', { class: 'btn small primary', onclick: () => { rs.reset(+bits.value); rs.start(); drawRes(); toast('Snapshot taken'); } }, 'New search'), val),
+      h('div', { class: 'btns search-row', style: { marginBottom: '12px' } },
+        h('button', { class: 'btn small', onclick: f('eq', true) }, 'Equals'), h('button', { class: 'btn small', onclick: f('ne', true) }, 'Not'),
+        h('button', { class: 'btn small', onclick: f('changed') }, 'Changed'), h('button', { class: 'btn small', onclick: f('same') }, 'Unchanged'),
+        h('button', { class: 'btn small', onclick: f('inc') }, 'Increased'), h('button', { class: 'btn small', onclick: f('dec') }, 'Decreased'),
+        h('button', { class: 'btn small', onclick: f('incby', true) }, 'Up by'), h('button', { class: 'btn small', onclick: f('decby', true) }, 'Down by'),
+      ), info, res));
+    b.append(sec('Code formats', h('div', { class: 'note', html: 'Supported: <b>Raw</b> (AAAAAAAA:VV, :VVVV or :VVVVVVVV), <b>CodeBreaker</b> writes, OR, AND, add and conditionals, <b>GameShark v1/v2</b> and <b>Action Replay v3</b> RAM writes and fills. Codes that patch the ROM are skipped.' })));
+  },
+
+  /* ---------------- LOOK ---------------- */
+  look(b) { lookPanel(b); this.video(b); },
+  video(b) {
+    b.append(sec('Screen shader', chips('shader', Object.entries(SHADERS).map(([k, v]) => [k, v.label]), redraw)));
+    b.append(sec('Screen picture',
+      row('GBA color correction', 'Matches the duller real screen', sw('colorFix', redraw)),
+      row('Frame blending', 'Fixes flicker transparency effects', sw('blend', redraw)),
+      row('Aspect', null, sel('aspect', [['native', 'Original'], ['4:3', '4:3'], ['stretch', 'Stretch to fit']], redraw)),
+      row('Integer scaling', 'Even pixels, may leave borders', sw('integer', redraw)),
+      row('Brightness', null, rng('brightness', 0.5, 1.6, 0.05, redraw, v => Math.round(v * 100) + '%')),
+      row('Saturation', null, rng('saturation', 0, 2, 0.05, redraw, v => Math.round(v * 100) + '%')),
+      row('Contrast', null, rng('contrast', 0.5, 1.6, 0.05, redraw, v => Math.round(v * 100) + '%')),
+      row('Show FPS', null, sw('showFps', () => Emu.hud())),
+      h('div', { class: 'btns', style: { marginTop: '8px' } }, h('button', { class: 'btn small', onclick: () => { for (const k of ['shader', 'colorFix', 'blend', 'aspect', 'integer', 'brightness', 'saturation', 'contrast']) S[k] = DEFAULTS[k]; saveSettings(); redraw(); Sheet.render(); } }, 'Reset video')),
+    ));
+  },
+
+  /* ---------------- AUDIO ---------------- */
+  audio(b) {
+    b.append(sec('Output',
+      row('Volume', 'Up to 200%. The limiter stops clipping.', rng('volume', 0, 2, 0.05, applyAudio, v => Math.round(v * 100) + '%')),
+      row('Mute', null, sw('mute', applyAudio)),
+      row('Limiter', null, sw('limiter', applyAudio)),
+      row('While fast forwarding', null, sel('ffAudio', [['chop', 'Play sped-up audio'], ['mute', 'Mute']])),
+    ));
+    b.append(sec('Reverb', chips('reverb', Object.entries(REVERB_PRESETS).map(([k, v]) => [k, v.label]), applyAudio),
+      row('Mix', 'How much of the room you hear', rng('reverbMix', 0, 1, 0.02, applyAudio, v => Math.round(v * 100) + '%')),
+      row('Room size', null, rng('reverbSize', 0.4, 2, 0.05, applyAudio, v => Math.round(v * 100) + '%')),
+    ));
+    b.append(sec('Equalizer',
+      row('Bass', null, rng('bass', -12, 12, 1, applyAudio, v => (v > 0 ? '+' : '') + v + ' dB')),
+      row('Mids', null, rng('mid', -12, 12, 1, applyAudio, v => (v > 0 ? '+' : '') + v + ' dB')),
+      row('Treble', null, rng('treble', -12, 12, 1, applyAudio, v => (v > 0 ? '+' : '') + v + ' dB')),
+      row('Stereo width', '0% is mono, 200% is extra wide', rng('width', 0, 2, 0.05, applyAudio, v => Math.round(v * 100) + '%')),
+      row('Handheld speaker', 'Thin, boxy sound like the real thing', sw('speaker', applyAudio)),
+      h('div', { class: 'btns', style: { marginTop: '8px' } },
+        h('button', { class: 'btn small', onclick: () => { Object.assign(S, { bass: 6, mid: -1, treble: 3, width: 1.35, reverb: 'studio', reverbMix: 0.22 }); saveSettings(); applyAudio(); Sheet.render(); } }, 'Punchy preset'),
+        h('button', { class: 'btn small', onclick: () => { Object.assign(S, { bass: 3, mid: 0, treble: -2, width: 1.6, reverb: 'hall', reverbMix: 0.32, reverbSize: 1.2 }); saveSettings(); applyAudio(); Sheet.render(); } }, 'Big room preset'),
+        h('button', { class: 'btn small', onclick: () => { for (const k of ['bass', 'mid', 'treble', 'width', 'speaker', 'reverb', 'reverbMix', 'reverbSize']) S[k] = DEFAULTS[k]; saveSettings(); applyAudio(); Sheet.render(); } }, 'Flat'),
+      ),
+    ));
+  },
+
+  /* ---------------- CONTROLS ---------------- */
+  controls(b) {
+    b.append(sec('Touch controls',
+      row('Show on screen', null, sel('showTouch', [['auto', 'On touch devices'], ['on', 'Always'], ['off', 'Never']], () => { if (Emu.active) { Touch.build(); Emu.layoutScreen(); } })),
+      row('Opacity', null, rng('ctlOpacity', 0.15, 1, 0.05, () => Emu.active && Touch.build(), v => Math.round(v * 100) + '%')),
+      row('Turbo speed', 'Presses per second for TA, TB and turbo keys', sel('turboRate', [[2, '15'], [3, '10'], [4, '7.5'], [6, '5']])),
+      h('div', { class: 'btns', style: { marginTop: '8px' } },
+        Emu.active ? h('button', { class: 'btn primary small', onclick: () => { Sheet.close(); Touch.startEdit(); } }, 'Edit layout') : null,
+        h('button', { class: 'btn small', onclick: () => { S.layout = null; saveSettings(); if (Emu.active) Touch.build(); toast('Layouts reset'); } }, 'Reset layouts'),
+      ),
+      h('div', { class: 'note', style: { marginTop: '8px' } }, 'Each orientation has its own layout. Hidden buttons such as quick save, quick load, A+B and turbo can be turned on in the editor.')));
+    const keyName = c => c.replace(/^Key/, '').replace(/^Digit/, '').replace('Arrow', '');
+    const kbBox = h('div'), padBox = h('div');
+    const draw = () => {
+      kbBox.innerHTML = ''; padBox.innerHTML = '';
+      for (const [act, label] of ACTIONS) {
+        const keys = Object.entries(S.keys).filter(([, a]) => a === act).map(([c]) => c);
+        const pads = Object.entries(S.pad).filter(([, a]) => a === act).map(([c]) => c);
+        kbBox.append(row(label, null, h('span', { class: 'btns' }, h('button', { class: 'kbd', onclick: e => capture(e.target, act, 'key') }, keys.map(keyName).join(', ') || 'none'))));
+        padBox.append(row(label, null, h('span', { class: 'btns' }, h('button', { class: 'kbd', onclick: e => capture(e.target, act, 'pad') }, pads.map(p => 'B' + p).join(', ') || 'none'))));
+      }
+    };
+    const capture = (btn, act, type) => {
+      btn.classList.add('wait'); btn.textContent = type === 'key' ? 'press a key' : 'press a button';
+      const poll = setInterval(() => Input.pollPad(), 50);
+      Input.capture = ev => {
+        if (ev.type !== type) return;
+        clearInterval(poll); Input.capture = null;
+        if (type === 'key') { if (ev.code === 'Escape') { draw(); return; } if (ev.code === 'Delete') { for (const k in S.keys) if (S.keys[k] === act) delete S.keys[k]; } else S.keys = { ...S.keys, [ev.code]: act }; }
+        else S.pad = { ...S.pad, [ev.btn]: act };
+        saveSettings(); draw();
+      };
+    };
+    draw();
+    b.append(sec('Keyboard', h('div', { class: 'note', style: { marginBottom: '6px' } }, 'Tap a binding, then press the new key. Delete clears all keys for that action. Esc cancels.'), kbBox,
+      h('button', { class: 'btn small', onclick: () => { S.keys = structuredClone(DEFAULT_KEYS); saveSettings(); draw(); } }, 'Reset keyboard')));
+    b.append(sec('Gamepad', h('div', { class: 'note', style: { marginBottom: '6px' } }, 'Standard layout pads work out of the box. The left stick also drives the D-pad.'), padBox,
+      h('button', { class: 'btn small', onclick: () => { S.pad = structuredClone(DEFAULT_PAD); saveSettings(); draw(); } }, 'Reset gamepad')));
+  },
+
+  /* ---------------- SYSTEM ---------------- */
+  async system(b) {
+    b.append(sec('Behaviour',
+      row('Resume where I left off', 'Saves a snapshot when you leave a game', sw('autoResume')),
+      row('Auto snapshot every', null, sel('autoSaveSec', [[15, '15 s'], [30, '30 s'], [60, '1 min'], [300, '5 min']])),
+      row('Pause when menu opens', null, sw('pauseOnMenu')),
+      row('Pause in background', null, sw('pauseHidden')),
+      row('Keep screen on', null, sw('wakeLock', v => v ? Emu.requestWake() : Emu.releaseWake())),
+    ));
+    b.append(sec('Rewind',
+      row('Enable rewind', 'Takes effect next time a game starts', sw('rewind')),
+      row('Memory for rewind', 'More memory, longer rewind', sel('rewindMB', [[24, '24 MB'], [48, '48 MB'], [64, '64 MB'], [128, '128 MB'], [256, '256 MB']])),
+      row('Snapshot every', 'Fewer frames, smoother rewind', sel('rewindEvery', [[1, '1 frame'], [2, '2 frames'], [4, '4 frames'], [8, '8 frames']])),
+      row('Rewind speed', null, sel('rewindRate', [[1, 'Normal'], [2, 'Fast'], [4, 'Very fast']])),
+      Emu.active && Emu.rw ? h('div', { class: 'note' }, `Buffer: ${Emu.rw.count} steps, ${fmtBytes(Emu.rw.bytes)} used, about ${(Emu.rw.count * S.rewindEvery / 60).toFixed(0)} s of history`) : null,
+    ));
+    const bios = await DB.get('kv', 'bios');
+    b.append(sec('Core',
+      row('Idle loop handling', 'Remove is fastest and works for nearly all games', sel('idle', [['remove', 'Remove'], ['detect', 'Detect'], ['ignore', 'Accurate (slow)']], () => Emu.active && core.applyOptions(S))),
+      row('Allow left and right together', 'Real hardware cannot', sw('opposing', () => Emu.active && core.applyOptions(S))),
+      row('GBA BIOS', bios ? `Loaded (${fmtBytes(bios.length)}). Used next time a game starts.` : 'Optional. A built-in replacement runs nearly every game.', h('span', { class: 'btns' },
+        h('button', { class: 'btn small', onclick: async () => { const [f] = await pickFiles('.bin,.rom,.gba'); if (!f) return; const d = await readBytes(f); if (d.length !== 16384) return toast('A GBA BIOS is exactly 16 KB'); await DB.put('kv', 'bios', d); Sheet.render(); } }, bios ? 'Replace' : 'Load'),
+        bios ? h('button', { class: 'btn small danger', onclick: async () => { await DB.del('kv', 'bios'); Sheet.render(); } }, 'Remove') : null)),
+      bios ? row('Skip BIOS intro', null, sw('skipBios')) : null,
+    ));
+    const inc = h('input', { type: 'checkbox' });
+    b.append(sec('Backup',
+      h('div', { class: 'note', style: { marginBottom: '8px' } }, 'One file with your saves, save states, cheats and settings. Handy before clearing app data or moving to a new phone.'),
+      row('Include ROMs', 'Makes the file much bigger', h('label', { class: 'switch' }, inc, h('i'))),
+      h('div', { class: 'btns' },
+        h('button', { class: 'btn primary', onclick: () => exportBackup(inc.checked) }, 'Export backup'),
+        h('button', { class: 'btn', onclick: importBackup }, 'Import backup')),
+    ));
+    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> 1.1. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own.` })));
+  },
+};
+
+
+/* ---------------- Look panel ---------------- */
+function lookPanel(b) {
+  const L = () => { saveSettings(); applyLook(); };
+  // live preview of the controller
+  const pv = h('div', { class: 'pv' });
+  const mk = (k, x, y, sz, pill) => { const d = CTL_DEFS[k]; const e = h('div', { class: `ctl k-${k}${d.pill ? ' pill' : ''}${d.small ? ' small' : ''}`, 'data-k': k, style: { left: x + '%', top: y + '%', width: sz + 'px', height: (d.pill ? sz * 0.42 : sz) + 'px' } });
+    e.append(k === 'dpad' ? dpadEl() : h('div', { class: 'face' }, h('span', { class: 'lbl' }, d.label)));
+    pv.append(e); return e; };
+  pv.append(h('div', { class: 'pwall' }), h('div', { class: 'shade' }));
+  mk('dpad', 22, 50, 104); mk('a', 82, 38, 56); mk('b', 64, 62, 56); mk('select', 36, 88, 60); mk('start', 64, 88, 60);
+  pv.addEventListener('pointerdown', e => { const t = e.target.closest('.ctl'); if (!t) return; Audio_.ctx.resume().then(() => feedback()); t.classList.add('press'); if (t.dataset.k === 'dpad') t.firstChild.classList.add('p-right'); });
+  const up = () => pv.querySelectorAll('.ctl').forEach(c => { c.classList.remove('press'); c.firstChild.classList?.remove('p-right'); });
+  pv.addEventListener('pointerup', up); pv.addEventListener('pointerleave', up);
+  pv.style.touchAction = 'none'; pv.querySelectorAll('.ctl').forEach(c => c.style.pointerEvents = 'auto');
+  b.append(sec('Preview', pv, h('div', { class: 'note' }, 'Tap the buttons to feel the current settings')));
+
+  const sw2 = (cls, items, key, render) => { const box = h('div', { class: cls }); const draw = () => { box.innerHTML = ''; for (const it of items) box.append(render(it, S[key] === it[0], () => { S[key] = it[0]; L(); draw(); })); }; draw(); return box; };
+  b.append(sec('Appearance',
+    row('Theme', null, null), chips('theme', [['graphite', 'Graphite'], ['oled', 'OLED black'], ['light', 'Light']], applyLook),
+    row('Accent', ACCENTS[S.accent]?.[4], null),
+    sw2('swatches', Object.entries(ACCENTS).map(([k, a]) => [k, a]), 'accent', ([k, a], act, pick) => h('button', { class: 'swatch' + (act ? ' act' : ''), style: { background: a[0] }, 'aria-label': a[4], title: a[4], onclick: () => { pick(); Sheet.render(); } })),
+    row('Library covers', null, null), chips('grid', [['compact', 'Compact'], ['regular', 'Regular'], ['large', 'Large']], applyLook),
+    row('Reduce motion', 'Turns off sheet and toast animations', swRaw(S.motion === 'reduce', v => { S.motion = v ? 'reduce' : 'full'; L(); })),
+  ));
+  b.append(sec('Controller skin',
+    sw2('skins', Object.entries(SKINS), 'skin', ([k, sk], act, pick) => {
+      const v = sk.v; const sw = h('span', { class: 'sw', style: { background: `linear-gradient(${v[0]},${v[1]})` } },
+        h('i', { style: { background: `linear-gradient(${v[4]},${v[5]})` } }), h('i', { style: { background: `linear-gradient(${v[4]},${v[5]})` } }), h('b', { style: { background: v[3] } }), h('b', { style: { background: v[3] } }));
+      return h('button', { class: 'skin' + (act ? ' act' : ''), onclick: pick }, sw, sk.name);
+    }),
+    row('Surface', 'Auto shows the circuit board through clear skins', null),
+    chips('texture', [['auto', 'Auto'], ['matte', 'Matte'], ['brushed', 'Brushed'], ['grip', 'Grip'], ['pcb', 'Circuit'], ['armory', 'Armory']], applyLook),
+  ));
+  b.append(sec('Device',
+    row('Screen shell', 'A dark molded frame and logo strip around the screen', sw('shell', applyLook)),
+    row('Finish', 'How light catches the body', null), chips('gloss', [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss']], applyLook),
+    row('Speaker grille', null, sw('grille', applyLook)),
+    row('Sticker', 'A little pixel decal on the body', null),
+    sw2('chips', [['none', null], ...Object.keys(SPRITES).map(k => [k, SPRITES[k]])], 'decal', ([k, svg], act, pick) => h('button', { class: 'chip' + (act ? ' act' : ''), style: { display: 'inline-flex', alignItems: 'center', gap: '6px' }, onclick: pick }, svg ? h('span', { html: svg, style: { width: '28px', display: 'block', imageRendering: 'pixelated' } }) : 'None')),
+  ));
+  const wallThumb = h('span', { class: 'wall-thumb', style: _wallUrl ? { backgroundImage: `url(${_wallUrl})` } : null });
+  b.append(sec('Wallpaper',
+    h('div', { class: 'row' }, h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } }, wallThumb, h('div', null, h('div', { class: 't' }, 'Your own picture'), h('div', { class: 'd' }, _wallUrl ? 'Shaded and molded like the real body' : 'Any photo, shaded like molded plastic'))),
+      h('span', { class: 'btns' }, h('button', { class: 'btn small', onclick: async () => { const [f] = await pickFiles('image/*'); if (!f) return; try { await setWallpaperFromFile(f); Sheet.render(); toast('Wallpaper set'); } catch (e) { toast('Could not read that image'); } } }, _wallUrl ? 'Change' : 'Choose'),
+        _wallUrl ? h('button', { class: 'btn small danger', onclick: async () => { await clearWallpaper(); Sheet.render(); } }, 'Remove') : null)),
+    _wallUrl ? row('Use wallpaper', null, sw('wall', applyLook)) : null,
+    _wallUrl ? row('Dim', null, rng('wallDim', 0, 0.7, 0.05, applyLook, v => Math.round(v * 100) + '%')) : null,
+    _wallUrl ? row('Blur', null, rng('wallBlur', 0, 16, 1, applyLook, v => v + ' px')) : null,
+  ));
+  b.append(sec('Buttons',
+    row('Style', null, null), chips('btnStyle', [['console', 'Console'], ['real', 'Realistic'], ['soft', 'Soft'], ['flat', 'Flat'], ['clear', 'Clear']], applyLook),
+    row('Press travel', 'How far buttons sink when pressed', null), chips('press', [['none', 'None'], ['subtle', 'Subtle'], ['deep', 'Deep']], applyLook),
+    row('Show labels', null, sw('labels', applyLook)),
+    row('Click sound', 'Plays on every press, separate from game volume', null),
+    chips('click', [['off', 'Off'], ['soft', 'Soft tick'], ['clicky', 'Clicky'], ['thock', 'Thock'], ['membrane', 'Membrane']], v => Audio_.ctx.resume().then(() => clickSound(v))),
+    row('Click volume', null, rng('clickVol', 0.2, 2, 0.1, null, v => Math.round(v * 100) + '%')),
+    row('Vibration', null, null), chips('haptic', [['off', 'Off'], ['light', 'Light'], ['medium', 'Medium'], ['strong', 'Strong']], v => feedback()),
+  ));
+  b.append(sec('Effects',
+    row('Ambient glow', 'The game picture lights up the area around the screen', null),
+    chips('ambient', [['off', 'Off'], ['subtle', 'Subtle'], ['strong', 'Strong']], applyLook),
+    row('Screen bezel', 'A dark frame around the picture', sw('bezel', applyLook)),
+    row('Glass reflection', 'A faint sheen across the screen', sw('glass', applyLook)),
+    row('Power LED', 'Green running, amber fast forward, blue rewind, red recording', sw('led', applyLook)),
+    h('div', { class: 'btns', style: { marginTop: '12px' } }, h('button', { class: 'btn small', onclick: () => { for (const k of ['theme', 'accent', 'grid', 'motion', 'skin', 'texture', 'btnStyle', 'press', 'labels', 'click', 'clickVol', 'haptic', 'ambient', 'bezel', 'glass', 'led', 'shell', 'gloss', 'grille', 'decal', 'wallDim', 'wallBlur']) S[k] = DEFAULTS[k]; L(); Sheet.render(); } }, 'Reset look')),
+  ));
+}
+
+async function exportBackup(withRoms) {
+  toast('Building backup');
+  const out = { app: 'calzone-advance', v: 1, time: Date.now(), settings: S, meta: await DB.all('meta'), saves: {}, states: {}, cheats: {}, roms: {} };
+  for (const k of await DB.keys('saves')) out.saves[k] = bytesToB64(await DB.get('saves', k));
+  for (const k of await DB.keys('states')) { const r = await DB.get('states', k); out.states[k] = { ...r, data: bytesToB64(r.data) }; }
+  for (const k of await DB.keys('cheats')) out.cheats[k] = await DB.get('cheats', k);
+  if (withRoms) for (const k of await DB.keys('roms')) out.roms[k] = bytesToB64(await DB.get('roms', k));
+  download(`bullpup-backup-${stamp()}.json`, JSON.stringify(out), 'application/json');
+}
+async function importBackup() {
+  const [f] = await pickFiles('.json'); if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); if (j.app !== 'calzone-advance') throw new Error('Not a Bullpup backup file');
+    for (const m of j.meta || []) { if (j.roms?.[m.id]) await DB.put('roms', m.id, b64ToBytes(j.roms[m.id])); if (await DB.get('roms', m.id)) await DB.put('meta', m.id, m); }
+    for (const [k, v] of Object.entries(j.saves || {})) await DB.put('saves', k, b64ToBytes(v));
+    for (const [k, v] of Object.entries(j.states || {})) await DB.put('states', k, { ...v, data: b64ToBytes(v.data) });
+    for (const [k, v] of Object.entries(j.cheats || {})) await DB.put('cheats', k, v);
+    if (j.settings && await confirmD('Restore settings too?', 'Replaces your current video, audio, control and system settings.', 'Restore')) { Object.assign(S, j.settings); saveSettings(); }
+    toast('Backup imported'); Library.render(); Sheet.isOpen && Sheet.render();
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------------- edit bar ---------------- */
+function initEditBar() {
+  const cur = () => Touch.sel && Touch.layout()[Touch.sel];
+  $('#ebSize').oninput = e => { const c = cur(); if (!c) return; c.s = +e.target.value; Touch.build(); $$('.ctl').forEach(x => x.classList.toggle('sel', x.dataset.k === Touch.sel)); };
+  $('#ebOpacity').oninput = e => { const c = cur(); if (!c) return; c.o = +e.target.value; Touch.els[Touch.sel].style.opacity = c.o * S.ctlOpacity; };
+  $('#ebHide').onclick = () => { const c = cur(); if (!c) return; c.v = !c.v; Touch.build(); Touch.selUpdate(); };
+  $('#ebShowAll').onclick = () => { const L = Touch.layout(); for (const k in L) L[k].v = true; Touch.build(); };
+  $('#ebReset').onclick = () => { S.layout && delete S.layout[Touch.orient]; Touch.sel = null; Touch.build(); Touch.selUpdate(); };
+  $('#ebDone').onclick = () => Touch.endEdit();
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+(async function boot() {
+  try {
+    applyLook();
+    await DB.open();
+    await loadWallpaper();
+    core = new Core(); await core.init();
+    Audio_ = new AudioOut(); await Audio_.init(); Audio_.apply(S);
+    renderer = new Renderer($('#screen'));
+    Input.init(); Touch.init(); Sheet.init(); initEditBar(); Library.init();
+    $('#boot').remove();
+    window.__calzone = { core, Emu, S, DB, Audio_, Input };
+  } catch (e) {
+    console.error(e);
+    $('.boot-msg').textContent = 'Could not start: ' + (e.message || e);
+  }
+})();
