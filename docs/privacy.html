@@ -17,7 +17,7 @@
 <body>
 <main>
   <h1>Privacy policy</h1>
-  <p class="muted">Brad's Bullpup, Android app and web app. Last updated 16 November 2026.</p>
+  <p class="muted">Brad's Bullpup, Android app and web app. Last updated 16 November 2026 (version 1.7).</p>
 
   <p>Brad's Bullpup is an emulator that runs games you load yourself. It has no account, no ads, no analytics and no tracking. The app does not collect, send or sell any personal data.</p>
 
@@ -29,11 +29,13 @@
   </ul>
 
   <h2>Network access</h2>
-  <p>The Android app does not request the Internet permission and never connects to a server. The web version is downloaded once from GitHub Pages and then runs offline. GitHub may keep standard server logs for that download under <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>.</p>
+  <p>The app never connects to a server. The only connection it makes is the link cable: when you tap Host or Join, it connects directly to the other player's phone over your local Wi-Fi or hotspot, or over Bluetooth, and sends game link data (the bytes a real link cable would carry) and the game's title. Nothing goes over the internet and nothing is stored or logged. The web version is downloaded once from GitHub Pages and then runs offline. GitHub may keep standard server logs for that download under <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>.</p>
 
   <h2>Permissions</h2>
   <ul>
     <li><b>Vibration</b>, so on-screen buttons can give haptic feedback. You can turn it off in Settings, Look, Vibration.</li>
+    <li><b>Network and Wi-Fi state</b>, for the link cable over Wi-Fi and to find the other phone on your local network.</li>
+    <li><b>Nearby devices (Bluetooth)</b>, asked for only when you use the link cable over Bluetooth, to connect to a phone you've paired.</li>
     <li>Files are opened through the Android file picker, so the app only sees the files you pick.</li>
   </ul>
 

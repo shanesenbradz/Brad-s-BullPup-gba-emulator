@@ -2,7 +2,7 @@
 """Inline the web app, the mGBA core and the pixel sprites into dist/Brads_Bullpup.html."""
 import base64, glob, os, pathlib, shutil
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-VERSION = os.environ.get('VN', '1.6')
+VERSION = os.environ.get('VN', '1.7')
 W = ROOT / 'web'
 shell = (W / 'shell.html').read_text()
 css = (W / 'app.css').read_text()

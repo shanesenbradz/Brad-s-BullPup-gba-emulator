@@ -20,7 +20,8 @@ That writes `dist/Brads_Bullpup_play.aab`, signed with the upload key, targeting
 5. App content:
    - Privacy policy URL: https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/privacy.html
    - Ads: No
-   - Data safety: no data collected, no data shared. Data is not encrypted in transit because none is sent. Users can delete data by uninstalling.
+   - Data safety: Google counts anything the app sends off the phone as "collected". The only thing that leaves the phone is the link cable, which sends emulated cable bytes and the game's title straight to the other player's phone (no server, nothing stored, you never see it). None of that is one of Play's user data types, so "No data collected, no data shared" is a reasonable answer. If a reviewer disagrees, declare "App activity: Other actions" as optional, not shared, processed ephemerally. Users can delete data by uninstalling.
+   - Permissions declaration: none of the permissions used (Internet, Wi-Fi state, multicast, Bluetooth connect, vibrate) need a special declaration form.
    - Content rating (IARC questionnaire): category "Game" or "Utility". Answer no to violence, user interaction, sharing location and purchases. The pixel gun in the icon is a logo, not gameplay, so expect an Everyone / PEGI 3 rating.
    - Target audience: 13 and over (keeps it out of the Families policy).
    - Government app / news / health: No.
@@ -36,7 +37,7 @@ That writes `dist/Brads_Bullpup_play.aab`, signed with the upload key, targeting
 
 **Short description (80 characters max)**
 
-Fast, accurate handheld emulator built on mGBA. Offline, no ads, no tracking.
+Accurate handheld emulator with Wi-Fi and Bluetooth link. Offline, no ads.
 
 **Full description**
 
@@ -56,6 +57,8 @@ What you get:
 • Screenshots and MP4 clips saved to Downloads
 • One-file backup of every save, state, cheat and setting
 
-No games are included. Brad's Bullpup has no ads, no accounts and no internet access. Everything stays on your phone.
+• Link cable over Wi-Fi or Bluetooth: trade and battle with a friend's phone
+
+No games are included. Brad's Bullpup has no ads, no accounts and never connects to a server. Everything stays on your phone.
 
 Brad's Bullpup is not affiliated with or endorsed by Nintendo. Game Boy is a trademark of Nintendo.

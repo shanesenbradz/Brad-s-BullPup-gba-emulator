@@ -6,7 +6,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 TC=.toolchain; B=build
-VC=${VC:-7}; VN=${VN:-1.6}; TARGET=${TARGET:-36}
+VC=${VC:-8}; VN=${VN:-1.7}; TARGET=${TARGET:-36}
 if [ ! -d $TC/minapk ]; then
   mkdir -p $TC && (cd $TC && npm pack @drxiaozhi/minapk@0.5.1 aaptjs3@2.0.2 >/dev/null)
   mkdir -p $TC/minapk $TC/aapt && tar xzf $TC/drxiaozhi-minapk-*.tgz -C $TC/minapk && tar xzf $TC/aaptjs3-*.tgz -C $TC/aapt

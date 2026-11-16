@@ -49,6 +49,7 @@ class Core {
   unload() { if (!this.loaded) return; this.m._mgbawasm_unload(); this.m._free(this.stPtr); this.loaded = false; this.iw = this.wr = 0; }
   reset() { this.m._mgbawasm_reset(); this.locateMemory(); }
   frame() { this.m._mgbawasm_run_frame(); }
+  get canLink() { return !!this.m._mgbawasm_run_link; }
   get fps() { return this.m._mgbawasm_framerate_micro() / 1e6 || 59.7275; }
   get sampleRate() { return this.m._mgbawasm_sample_rate(); }
   setKeys(mask) { if (mask !== this._mask) { this._mask = mask; this.m._mgbawasm_set_keys(mask); } }

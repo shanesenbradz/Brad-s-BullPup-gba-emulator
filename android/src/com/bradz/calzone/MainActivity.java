@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
     private int padKeys, padAxes, padSent = -1;
+    private LinkManager link;
     private float padX, padY, padSentX = 9, padSentY = 9;
 
     @Override
@@ -84,6 +85,8 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         web.addJavascriptInterface(new Bridge(this), "CalzoneAndroid");
+        link = new LinkManager(this);
+        web.addJavascriptInterface(link, "BullpupLink");
 
         InputManager im = (InputManager) getSystemService(Context.INPUT_SERVICE);
         if (im != null) im.registerInputDeviceListener(new InputManager.InputDeviceListener() {
@@ -261,6 +264,35 @@ public class MainActivity extends Activity {
 
     private void js(String code) { if (web != null) web.evaluateJavascript(code, null); }
 
+    private static String jsStr(String s) {
+        StringBuilder b = new StringBuilder("'");
+        for (char c : s.toCharArray()) {
+            if (c == '\\' || c == '\'') b.append('\\').append(c);
+            else if (c == '\n') b.append("\\n");
+            else if (c == '\r') { }
+            else if (c < 32 || c == 0x2028 || c == 0x2029) b.append(String.format("\\u%04x", (int) c));
+            else b.append(c);
+        }
+        return b.append('\'').toString();
+    }
+
+    /* ---------- link cable transport (LinkManager) ---------- */
+    void linkEvent(String type, String data) {
+        String code = "window.bullpupLinkEvent&&bullpupLinkEvent(" + jsStr(type) + "," + jsStr(data) + ")";
+        runOnUiThread(() -> js(code));
+    }
+
+    void linkMessage(String line) {
+        String code = "window.bullpupLinkMsg&&bullpupLinkMsg(" + jsStr(line) + ")";
+        runOnUiThread(() -> js(code));
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(req, perms, results);
+        if (req == LinkManager.REQ_BT) linkEvent("perm", results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED ? "granted" : "denied");
+    }
+
     private void sendPad() {
         int padButtons = padKeys | padAxes;
         if (padButtons == padSent && Math.abs(padX - padSentX) < 0.05f && Math.abs(padY - padSentY) < 0.05f) return;
@@ -327,6 +359,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (link != null) link.close("exit");
         if (web != null) { web.destroy(); web = null; }
         super.onDestroy();
     }

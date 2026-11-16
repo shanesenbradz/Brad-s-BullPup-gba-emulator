@@ -172,7 +172,7 @@ const Sheet = {
   toggle() { this.isOpen ? this.close() : this.open(); },
   open(tab) {
     if (tab) this.tab = tab; if (!this.tabs().some(t => t[0] === this.tab)) this.tab = this.tabs()[0][0];
-    if (Emu.active && S.pauseOnMenu) { this._paused = !Emu.paused; Emu.pause(true); }
+    if (Emu.active && S.pauseOnMenu && !Link.active) { this._paused = !Emu.paused; Emu.pause(true); }
     $('#sheet').classList.remove('hidden'); $('#scrim').classList.remove('hidden');
     $('#sheetTitle').textContent = Emu.active ? Emu.game.name : 'Settings';
     $('#sheetSub').textContent = Emu.active ? `${Emu.game.system.toUpperCase()}  ·  SN ${Emu.game.crc}  ·  ${Emu.game.playSec >= 1 ? fmtTime(Emu.game.playSec) : 'first session'}` : 'Applies to every game';
@@ -193,6 +193,53 @@ const Sheet = {
   },
 };
 
+/* ---------- link cable section of the game menu ---------- */
+function linkPanel() {
+  const L = Link, note = t => h('div', { class: 'note', style: { marginTop: '8px' } }, t);
+  const btn = (label, fn, primary) => h('button', { class: 'btn small' + (primary ? ' primary' : ''), onclick: fn }, label);
+  const kids = [];
+  if (!L.native) {
+    kids.push(row('Not available here', 'Trading and battling over a link cable needs the Android app on both phones.', null));
+    return sec('Link cable', ...kids);
+  }
+  if (!core.canLink) { kids.push(row('Not available', 'This build of the core has no link cable support.', null)); return sec('Link cable', ...kids); }
+  const how = L.how === 'bt' ? 'Bluetooth' : 'Wi-Fi';
+  if (L.state === 'linked') {
+    kids.push(row(`Linked${L.peer ? ' with ' + L.peer : ''}`, '', h('span', { class: 'link-dot on' })));
+    kids.push(h('div', { class: 'note', id: 'linkStat' }));
+    kids.push(h('div', { class: 'btns', style: { marginTop: '8px' } }, btn('Disconnect', () => L.cancel())));
+    kids.push(note('Fast forward, rewind and loading states are off while linked, so both games stay in step. Save in the game as usual.'));
+    setTimeout(() => L.paintStatus(), 0);
+  } else if (L.state === 'hosting') {
+    kids.push(row(`Waiting for the other phone on ${how}`, L.how === 'wifi' ? (L.ip ? `On the other phone tap Join on Wi-Fi. If it doesn't show up, type ${L.ip}` : 'Getting this phone\'s address') : 'On the other phone tap Join on Bluetooth and pick this phone', h('span', { class: 'link-dot wait' })));
+    kids.push(h('div', { class: 'btns', style: { marginTop: '8px' } }, btn('Cancel', () => L.cancel())));
+  } else if (L.state === 'connecting') {
+    kids.push(row(`Connecting over ${how}`, L.peer || '', h('span', { class: 'link-dot wait' })));
+    kids.push(h('div', { class: 'btns', style: { marginTop: '8px' } }, btn('Cancel', () => L.cancel())));
+  } else if (L.state === 'searching' && L.how === 'wifi') {
+    kids.push(row('Looking for a phone hosting on Wi-Fi', 'Both phones need to be on the same Wi-Fi, or one on the other\'s hotspot.', h('span', { class: 'link-dot wait' })));
+    for (const f of L.found) kids.push(h('button', { class: 'btn link-host', onclick: () => L.joinWifi(f.ip, f.port) }, `${f.name}  ·  ${f.ip}`));
+    const ip = h('input', { type: 'text', inputmode: 'decimal', placeholder: '192.168.1.20', class: 'ip-in', value: localStorage.getItem('bullpup.lastIp') || '' });
+    kids.push(h('div', { class: 'btns', style: { marginTop: '10px' } }, ip,
+      btn('Connect', () => { const v = ip.value.trim(); if (!/^\d+\.\d+\.\d+\.\d+$/.test(v)) return toast('Type the IP shown on the host phone'); localStorage.setItem('bullpup.lastIp', v); L.joinWifi(v, 0); }, true),
+      btn('Cancel', () => { L.native.stopSearch(); L.cancel(); })));
+  } else if (L.state === 'searching' && L.how === 'bt') {
+    kids.push(row('Pick the other phone', 'Only phones already paired in Android Bluetooth settings show here.', null));
+    for (const f of L.found) kids.push(h('button', { class: 'btn link-host', onclick: () => L.joinBt(f.address, f.name) }, f.name || f.address));
+    if (!L.found.length) kids.push(note('No paired phones yet.'));
+    kids.push(h('div', { class: 'btns', style: { marginTop: '10px' } },
+      window.CalzoneAndroid?.openBluetooth ? btn('Pair phones', () => CalzoneAndroid.openBluetooth()) : null,
+      btn('Refresh', () => L.searchBt()), btn('Cancel', () => L.cancel())));
+  } else {
+    kids.push(row('Trade and battle with a friend', 'Start the same kind of game on both phones (GBA with GBA, Game Boy with Game Boy). One phone hosts, the other joins.', null));
+    kids.push(h('div', { class: 'btns', style: { marginTop: '8px' } }, btn('Host on Wi-Fi', () => L.hostWifi(), true), btn('Join on Wi-Fi', () => L.searchWifi())));
+    kids.push(h('div', { class: 'btns', style: { marginTop: '8px' } }, btn('Host on Bluetooth', () => L.hostBt()), btn('Join on Bluetooth', () => L.searchBt())));
+    kids.push(note('Wi-Fi is faster and the best choice for trades. With no Wi-Fi around, turn on the hotspot on one phone and connect the other to it. For Bluetooth, pair the two phones in Android settings first. In Pokémon, both players then walk up to the Cable Club or Colosseum desk at the same time.'));
+  }
+  if (L.error) kids.push(h('div', { class: 'note link-err', style: { marginTop: '8px' } }, L.error));
+  return sec('Link cable', ...kids);
+}
+
 const Panels = {
   /* ---------------- GAME ---------------- */
   async game(b) {
@@ -202,6 +249,7 @@ const Panels = {
       h('button', { class: 'btn', onclick: async () => { if (await confirmD('Reset the game?', 'Unsaved progress since your last in-game save is lost. Your save file is kept.', 'Reset')) { Emu.reset(); Sheet.close(); } } }, 'Reset'),
       h('button', { class: 'btn', onclick: () => { Sheet.close(); Emu.stop(); } }, 'Exit to library'),
     )));
+    b.append(linkPanel());
     // speed
     b.append(sec('Speed',
       row('Fast forward', 'Also on the >> button, Space or R2', swRaw(Emu.ffToggle, () => Emu.hotkey('ff_toggle'))),

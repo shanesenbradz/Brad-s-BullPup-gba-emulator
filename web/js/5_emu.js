@@ -40,6 +40,7 @@ const Emu = {
   },
   async stop() {
     if (!this.active) return;
+    if (Link.state !== 'off') Link.cancel();
     this.stopRecording();
     cancelAnimationFrame(this.raf); this.timers?.forEach(clearInterval);
     await this.persistAll();
@@ -99,6 +100,7 @@ const Emu = {
 
   /* ---------- main loop ---------- */
   speed() {
+    if (Link.active) return 1; // both phones must run at real speed while linked
     if (this.rewinding) return 1;
     if (Input.holds.has('ff_hold') || this.ffToggle) return S.ffSpeed;
     return this.slow ? S.slowSpeed : 1;
@@ -109,11 +111,12 @@ const Emu = {
     Input.pollPad();
     const dt = this.last ? Math.min(now - this.last, 100) : 16.7; this.last = now;
     if (this.paused) return;
+    if (Link.active) Link.watchdog(now);
     const fps = core.fps, sp = this.speed();
     const rate = core.sampleRate || 32768;
     Audio_.setRate(rate, sp < 1 ? sp : 1);
 
-    if (this.rewinding && this.rw) {
+    if (this.rewinding && this.rw && !Link.active) {
       let stepped = false;
       for (let i = 0; i < S.rewindRate; i++) { if (!this.rw.step(core)) break; stepped = true; }
       if (stepped) { core.setKeys(0); core.frame(); core.drainAudio(null); renderer.draw(core.video(), S); }
@@ -135,18 +138,45 @@ const Emu = {
     }
     if (frames <= 0) return;
     const chopEvery = sp > 1 ? Math.round(sp) : 1;
+    let ran = 0;
     for (let i = 0; i < frames; i++) {
       this.frameNo++;
       core.setKeys(this.inputMask());
       if (this.cheatOps.length && core.hasMem) runCheatOps(core, this.cheatOps, this.inputMask());
-      core.frame();
+      if (Link.active) {
+        // the link can pause us mid-frame until the other phone answers; linkKick resumes it
+        if (Link.runFrame() !== 1) { this.linkStalled = true; core.drainAudio((c, n) => Audio_.push(c, n)); break; }
+        this.linkStalled = false;
+      } else core.frame();
+      ran++;
       if (sp > 1 && (S.ffAudio === 'mute' || this.frameNo % chopEvery)) core.drainAudio(null);
       else core.drainAudio((c, n) => Audio_.push(c, n));
-      if (this.rw && this.frameNo % S.rewindEvery === 0) this.rw.capture(core);
+      if (this.rw && !Link.active && this.frameNo % S.rewindEvery === 0) this.rw.capture(core);
     }
+    if (!ran) return;
     renderer.draw(core.video(), S);
     if (S.ambient !== 'off' && (this._ambN = (this._ambN || 0) + 1) % 8 === 0) sampleAmbient();
-    this.countFps(now, frames);
+    this.countFps(now, ran);
+  },
+  // An answer from the other phone arrived: carry on with the frame straight away instead of
+  // waiting for the next screen refresh, which keeps link-heavy screens (trades) moving.
+  linkKick() {
+    if (!this.active || !Link.active || !this.linkStalled || this.paused) return;
+    if (Link.runFrame() === 1) {
+      this.linkStalled = false;
+      core.drainAudio((c, n) => Audio_.push(c, n));
+      renderer.draw(core.video(), S);
+    }
+  },
+  // The other phone is waiting on us and our game hasn't re-armed its port yet: run just
+  // far enough for it to answer (at most a couple of frames), then leave the frame half done.
+  linkService() {
+    if (!this.active || !Link.active || this.paused) return;
+    for (let i = 0; i < 3 && Link.rxPending; i++) {
+      const r = Link.runFrame(true);
+      if (r === 1) { this.linkStalled = false; core.drainAudio((c, n) => Audio_.push(c, n)); renderer.draw(core.video(), S); }
+      else { this.linkStalled = true; if (r === 0) break; }
+    }
   },
   audioClock(now) {
     const t = Audio_.ctx.currentTime;
@@ -167,7 +197,7 @@ const Emu = {
   },
   hud() {
     const sp = this.speed();
-    $('#hudSpeed').textContent = this.paused && this.userPaused ? 'PAUSED' : this.rewinding ? '<< REWIND' : sp > 1 ? `>> ${sp}x` : sp < 1 ? `${sp}x` : '';
+    $('#hudSpeed').textContent = this.paused && this.userPaused ? 'PAUSED' : Link.active ? 'LINK' : this.rewinding ? '<< REWIND' : sp > 1 ? `>> ${sp}x` : sp < 1 ? `${sp}x` : '';
     $('#hudFps').textContent = S.showFps ? `${this.fps.toFixed(0)} fps` : '';
     this.updateLed();
   },
@@ -176,7 +206,7 @@ const Emu = {
     for (const id of ['plateLed', 'bezLed']) { const e = document.getElementById(id); if (e) e.className = 'led ' + st; }
   },
   onHoldChange() {
-    const rw = Input.holds.has('rw_hold') && !!this.rw;
+    const rw = Input.holds.has('rw_hold') && !!this.rw && !Link.active;
     if (rw !== this.rewinding) {
       this.rewinding = rw;
       if (!rw) { Audio_.flush(); this.acc = 0; }
@@ -245,6 +275,7 @@ const Emu = {
     toast('Saved to slot ' + n); Sheet.refreshIf('game');
   },
   async loadSlot(n) {
+    if (Link.active) return toast('Disconnect the link cable before loading a state');
     const rec = await DB.get('states', this.game.id + ':' + n);
     if (!rec) return toast('Slot ' + n + ' is empty');
     this.undoLoad = core.saveState();
