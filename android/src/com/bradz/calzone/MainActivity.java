@@ -13,7 +13,10 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.hardware.input.InputManager;
+import android.view.InputDevice;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -45,6 +48,8 @@ public class MainActivity extends Activity {
     private static final int PICK = 41;
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
+    private int padKeys, padAxes, padSent = -1;
+    private float padX, padY, padSentX = 9, padSentY = 9;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -79,6 +84,13 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         web.addJavascriptInterface(new Bridge(this), "CalzoneAndroid");
+
+        InputManager im = (InputManager) getSystemService(Context.INPUT_SERVICE);
+        if (im != null) im.registerInputDeviceListener(new InputManager.InputDeviceListener() {
+            @Override public void onInputDeviceAdded(int id) { padEvent(id, true); }
+            @Override public void onInputDeviceRemoved(int id) { padKeys = padAxes = 0; padX = padY = 0; sendPad(); js("window.bullpupPadEvent&&bullpupPadEvent(false,'')"); }
+            @Override public void onInputDeviceChanged(int id) { }
+        }, null);
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -212,11 +224,86 @@ public class MainActivity extends Activity {
         });
     }
 
+    /* ---------- Bluetooth and USB controllers ----------
+     * Android pairs the controller; we read it here and hand the page one combined state in the
+     * standard Gamepad API button order, so the page's remapping works the same for every pad.
+     * Events are consumed so a pad's B button never doubles as the system back key. */
+    private static boolean isPad(InputDevice d) {
+        if (d == null || d.isVirtual()) return false;
+        int s = d.getSources();
+        return (s & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD || (s & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
+    }
+
+    private static int padIndex(int code) {
+        switch (code) {
+            case KeyEvent.KEYCODE_BUTTON_A: return 0;
+            case KeyEvent.KEYCODE_BUTTON_B: return 1;
+            case KeyEvent.KEYCODE_BUTTON_X: return 2;
+            case KeyEvent.KEYCODE_BUTTON_Y: return 3;
+            case KeyEvent.KEYCODE_BUTTON_L1: return 4;
+            case KeyEvent.KEYCODE_BUTTON_R1: return 5;
+            case KeyEvent.KEYCODE_BUTTON_L2: return 6;
+            case KeyEvent.KEYCODE_BUTTON_R2: return 7;
+            case KeyEvent.KEYCODE_BUTTON_SELECT: return 8;
+            case KeyEvent.KEYCODE_BUTTON_START: return 9;
+            case KeyEvent.KEYCODE_BUTTON_THUMBL: return 10;
+            case KeyEvent.KEYCODE_BUTTON_THUMBR: return 11;
+            case KeyEvent.KEYCODE_DPAD_UP: return 12;
+            case KeyEvent.KEYCODE_DPAD_DOWN: return 13;
+            case KeyEvent.KEYCODE_DPAD_LEFT: return 14;
+            case KeyEvent.KEYCODE_DPAD_RIGHT: return 15;
+            case KeyEvent.KEYCODE_BUTTON_MODE: return 16;
+            case KeyEvent.KEYCODE_BUTTON_C: return 2;
+            case KeyEvent.KEYCODE_BUTTON_Z: return 3;
+            default: return -1;
+        }
+    }
+
+    private void js(String code) { if (web != null) web.evaluateJavascript(code, null); }
+
+    private void sendPad() {
+        int padButtons = padKeys | padAxes;
+        if (padButtons == padSent && Math.abs(padX - padSentX) < 0.05f && Math.abs(padY - padSentY) < 0.05f) return;
+        padSent = padButtons; padSentX = padX; padSentY = padY;
+        js("window.bullpupPad&&bullpupPad(" + padButtons + "," + padX + "," + padY + ")");
+    }
+
+    private void padEvent(int id, boolean added) {
+        InputDevice d = InputDevice.getDevice(id);
+        if (!isPad(d)) return;
+        String name = d.getName() == null ? "Controller" : d.getName().replace("\\", "").replace("'", "");
+        js("window.bullpupPadEvent&&bullpupPadEvent(" + added + ",'" + name + "')");
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
-        // Let gamepad and keyboard keys reach the page even when focus wandered off the WebView.
+        int idx = padIndex(e.getKeyCode());
+        if (idx >= 0 && isPad(e.getDevice())) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN) padKeys |= 1 << idx;
+            else if (e.getAction() == KeyEvent.ACTION_UP) padKeys &= ~(1 << idx);
+            sendPad();
+            return true;
+        }
+        // Let keyboard keys reach the page even when focus wandered off the WebView.
         if (web != null && !web.hasFocus() && e.getKeyCode() != KeyEvent.KEYCODE_BACK) web.requestFocus();
         return super.dispatchKeyEvent(e);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent e) {
+        if ((e.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK && e.getAction() == MotionEvent.ACTION_MOVE) {
+            float hx = e.getAxisValue(MotionEvent.AXIS_HAT_X), hy = e.getAxisValue(MotionEvent.AXIS_HAT_Y);
+            float lt = Math.max(e.getAxisValue(MotionEvent.AXIS_LTRIGGER), e.getAxisValue(MotionEvent.AXIS_BRAKE));
+            float rt = Math.max(e.getAxisValue(MotionEvent.AXIS_RTRIGGER), e.getAxisValue(MotionEvent.AXIS_GAS));
+            // the hat is the D-pad on most Bluetooth pads, the triggers are often axes too
+            int hat = (hy < -0.5f ? 1 << 12 : 0) | (hy > 0.5f ? 1 << 13 : 0) | (hx < -0.5f ? 1 << 14 : 0) | (hx > 0.5f ? 1 << 15 : 0);
+            int trig = (lt > 0.5f ? 1 << 6 : 0) | (rt > 0.5f ? 1 << 7 : 0);
+            padAxes = hat | trig;
+            padX = e.getAxisValue(MotionEvent.AXIS_X); padY = e.getAxisValue(MotionEvent.AXIS_Y);
+            sendPad();
+            return true;
+        }
+        return super.dispatchGenericMotionEvent(e);
     }
 
     @Override
@@ -293,6 +380,26 @@ public class MainActivity extends Activity {
             }
             if (vib == null) vib = (android.os.Vibrator) a.getSystemService(Context.VIBRATOR_SERVICE);
             return vib;
+        }
+
+        /** Opens Android's Bluetooth screen so a controller can be paired without leaving for Settings by hand. */
+        @JavascriptInterface
+        public void openBluetooth() {
+            a.runOnUiThread(() -> {
+                try { a.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)); }
+                catch (Exception e) { try { a.startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS)); } catch (Exception ignored) { } }
+            });
+        }
+
+        /** Names of connected controllers, separated by newlines. */
+        @JavascriptInterface
+        public String padNames() {
+            StringBuilder b = new StringBuilder();
+            for (int id : InputDevice.getDeviceIds()) {
+                InputDevice d = InputDevice.getDevice(id);
+                if (isPad(d)) { if (b.length() > 0) b.append('\n'); b.append(d.getName()); }
+            }
+            return b.toString();
         }
 
         /** Legacy entry point kept for pages built before 1.5. */

@@ -8,7 +8,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 TC=.toolchain; B=build-aab
-PKG=${PKG:-com.bradz.bullpup}; VC=${VC:-6}; VN=${VN:-1.5}; TARGET=${TARGET:-36}
+PKG=${PKG:-com.bradz.bullpup}; VC=${VC:-7}; VN=${VN:-1.6}; TARGET=${TARGET:-36}
 T=$TC/minapk/package/tools; AJ=$T/android.jar
 [ -d $TC/minapk ] || { echo "Run tools/build_apk.sh first to fetch the toolchain"; exit 1; }
 case "$(uname -s)" in Darwin) AAPT2=$TC/aapt/package/bin/x64/darwin/aapt2;; *) AAPT2=$TC/aapt/package/bin/x64/linux/aapt2;; esac

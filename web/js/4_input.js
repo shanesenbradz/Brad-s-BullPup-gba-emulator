@@ -76,27 +76,50 @@ const Input = {
     if (!down) return;
     Emu.hotkey(act);
   },
+  // controllers read by the Android app (Bluetooth and USB), pushed in standard Gamepad API order
+  native: { btns: 0, x: 0, y: 0 }, padActive: false, padNames: [],
   pollPad() {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(p => p && p.connected)
+      .map(p => ({ pressed: i => { const b = p.buttons[i]; return !!b && (b.pressed || b.value > 0.5); }, n: p.buttons.length, ax: p.axes }));
+    const N = this.native;
+    if (N.btns || N.x || N.y || window.CalzoneAndroid) pads.push({ pressed: i => !!(N.btns & (1 << i)), n: 17, ax: [N.x, N.y] });
     let mask = 0; const seen = {};
     for (const p of pads) {
-      if (!p || !p.connected) continue;
-      p.buttons.forEach((b, i) => {
-        const pressed = b.pressed || b.value > 0.5;
-        if (pressed) seen[i] = true;
-        if (this.capture && pressed && !this.padPrev[i]) { this.capture({ type: 'pad', btn: i }); }
-        const act = S.pad[i]; if (!act) return;
-        const bit = this.bitOf(act);
-        if (bit) { if (pressed) mask |= bit; }
-        else if (pressed !== !!this.padPrev[i] && !this.capture) this.action(act, pressed, 'pad');
-      });
-      const ax = p.axes;
+      for (let i = 0; i < p.n; i++) {
+        const pressed = p.pressed(i);
+        if (!pressed || seen[i]) continue;
+        seen[i] = true;
+        if (this.capture && !this.padPrev[i]) { this.capture({ type: 'pad', btn: i }); }
+        const act = S.pad[i]; if (!act) continue;
+        const bit = this.bitOf(act); if (bit) mask |= bit;
+      }
+      const ax = p.ax || [];
       if (ax[0] < -0.45) mask |= 1 << KEY_BIT.left; if (ax[0] > 0.45) mask |= 1 << KEY_BIT.right;
       if (ax[1] < -0.45) mask |= 1 << KEY_BIT.up; if (ax[1] > 0.45) mask |= 1 << KEY_BIT.down;
     }
+    if (!this.capture) for (const i of new Set([...Object.keys(seen), ...Object.keys(this.padPrev)])) {
+      const act = S.pad[i]; if (!act || this.bitOf(act)) continue;
+      if (!!seen[i] !== !!this.padPrev[i]) this.action(act, !!seen[i], 'pad');
+    }
+    if ((mask || Object.keys(seen).length) && !this.padActive) this.setPadActive(true);
     this.padPrev = seen; this.pad = mask;
   },
+  // In "On touch devices" mode the touch buttons step aside while a controller is in use and come back on the next tap
+  setPadActive(on) {
+    if (this.padActive === on) return; this.padActive = on;
+    if (S.showTouch === 'auto' && Emu.active) { Touch.build(); Emu.layoutScreen(); }
+  },
 };
+const PAD_NAMES = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'L2', 'R2', 'Select', 'Start', 'L3', 'R3', 'Up', 'Down', 'Left', 'Right', 'Home'];
+window.bullpupPad = (btns, x, y) => { Input.native = { btns, x, y }; };
+window.bullpupPadEvent = (connected, name) => {
+  try { Input.padNames = (window.CalzoneAndroid?.padNames?.() || '').split('\n').filter(Boolean); } catch (e) {}
+  if (connected) toast(`${name || 'Controller'} connected`);
+  else { toast('Controller disconnected'); Input.native = { btns: 0, x: 0, y: 0 }; Input.setPadActive(false); }
+  if (typeof Sheet !== 'undefined' && Sheet.tab === 'controls' && !$('#sheet').classList.contains('hidden')) Sheet.render();
+};
+addEventListener('gamepadconnected', e => toast(`${e.gamepad.id.replace(/\s*\(.*$/, '') || 'Controller'} connected`));
+addEventListener('pointerdown', e => { if (Input.padActive && e.pointerType === 'touch') Input.setPadActive(false); }, { capture: true });
 
 /* ============================================================
    Touch controls
@@ -138,6 +161,7 @@ const Touch = {
   },
   visible() {
     if (S.showTouch === 'on') return true; if (S.showTouch === 'off') return false;
+    if (Input.padActive) return false;
     return matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   },
   build() {

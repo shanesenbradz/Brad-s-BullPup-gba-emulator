@@ -13,13 +13,19 @@ No games are included. Load ROMs you dumped from cartridges you own.
 
 ## Install
 
-Download [Brads_Bullpup_1.5.apk](release/Brads_Bullpup_1.5.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
+Download [Brads_Bullpup_1.6.apk](release/Brads_Bullpup_1.6.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
 
-You can also skip the install and [run it in the browser](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/). It works offline after the first visit, and Chrome's "Add to Home screen" or "Install app" turns it into a full-screen app. [Brads_Bullpup_1.5.html](release/Brads_Bullpup_1.5.html?raw=1) is the same thing as one file you can keep on a phone or PC.
+You can also skip the install and [run it in the browser](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/). It works offline after the first visit, and Chrome's "Add to Home screen" or "Install app" turns it into a full-screen app. [Brads_Bullpup_1.6.html](release/Brads_Bullpup_1.6.html?raw=1) is the same thing as one file you can keep on a phone or PC.
 
 It runs on Android 7 and up.
 
-**Coming from 1.4 or older:** 1.5 is signed with a new long-term release key, so Android won't install it over 1.4. In 1.4 go to System and export a backup, uninstall 1.4, install 1.5 and import the backup. Every version from 1.5 on uses this key and updates in place, keeping your games, saves and states.
+**Coming from 1.4 or older:** 1.5 and later are signed with a new long-term release key, so Android won't install it over 1.4. In 1.4 go to System and export a backup, uninstall 1.4, install 1.5 and import the backup. Every version from 1.5 on uses this key and updates in place, keeping your games, saves and states.
+
+## What's new in 1.6
+
+- Bluetooth and USB controllers are read by the Android app itself, so Xbox, PlayStation, 8BitDo, Switch Pro and generic pads all work, including D-pads and triggers that report as axes. A controller's B button no longer doubles as the back key.
+- Input has a Controllers section that shows what's connected and a "Pair a Bluetooth controller" button that opens Android's Bluetooth screen. Gamepad bindings show real button names (A, L1, Start) instead of numbers.
+- You get a message when a controller connects or disconnects, and the touch buttons hide while you play on a controller and come back as soon as you tap the screen.
 
 ## What's new in 1.5
 
@@ -41,7 +47,7 @@ Emulation is mGBA, one of the most accurate GBA emulators around. On top of that
 - IPS, UPS and BPS patches for ROM hacks and translations
 - Screen shaders (LCD grid, subpixels, scanlines, CRT, DMG green), GBA colour correction and frame blending
 - Audio effects: reverb with 6 rooms, a 3-band EQ, stereo width and a handheld speaker mode
-- Gamepad and keyboard remapping, turbo buttons, and a touch layout editor with separate portrait and landscape layouts
+- Bluetooth and USB controller support with remapping, keyboard remapping, turbo buttons, and a touch layout editor with separate portrait and landscape layouts
 - Screenshots and video clip recording, saved to Downloads/Bullpup. Clips are MP4 (H.264 and AAC) on phones that can encode it, so they send straight to WhatsApp, and WebM otherwise
 - A backup file with all saves, states, cheats and settings
 

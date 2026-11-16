@@ -366,7 +366,7 @@ const Panels = {
         const keys = Object.entries(S.keys).filter(([, a]) => a === act).map(([c]) => c);
         const pads = Object.entries(S.pad).filter(([, a]) => a === act).map(([c]) => c);
         kbBox.append(row(label, null, h('span', { class: 'btns' }, h('button', { class: 'kbd', onclick: e => capture(e.target, act, 'key') }, keys.map(keyName).join(', ') || 'none'))));
-        padBox.append(row(label, null, h('span', { class: 'btns' }, h('button', { class: 'kbd', onclick: e => capture(e.target, act, 'pad') }, pads.map(p => 'B' + p).join(', ') || 'none'))));
+        padBox.append(row(label, null, h('span', { class: 'btns' }, h('button', { class: 'kbd', onclick: e => capture(e.target, act, 'pad') }, pads.map(p => PAD_NAMES[p] || 'B' + p).join(', ') || 'none'))));
       }
     };
     const capture = (btn, act, type) => {
@@ -381,10 +381,21 @@ const Panels = {
       };
     };
     draw();
+    let names = Input.padNames;
+    try { if (window.CalzoneAndroid?.padNames) names = CalzoneAndroid.padNames().split('\n').filter(Boolean); } catch (e) {}
+    if (!names.length && navigator.getGamepads) names = [...navigator.getGamepads()].filter(Boolean).map(p => p.id.replace(/\s*\(.*$/, ''));
+    b.append(sec('Controllers',
+      row(names.length ? names.join(', ') : 'No controller connected', names.length ? 'Ready. The touch buttons hide while you use it and come back when you tap the screen.' : 'Xbox, PlayStation, 8BitDo, Switch Pro and most Bluetooth or USB pads work.', null),
+      h('div', { class: 'btns', style: { marginTop: '8px' } },
+        window.CalzoneAndroid?.openBluetooth ? h('button', { class: 'btn primary small', onclick: () => CalzoneAndroid.openBluetooth() }, 'Pair a Bluetooth controller') : null,
+        h('button', { class: 'btn small', onclick: () => Sheet.render() }, 'Refresh')),
+      h('div', { class: 'note', style: { marginTop: '8px' } }, window.CalzoneAndroid
+        ? 'Put the controller in pairing mode (Xbox: hold the pair button; PlayStation: hold Share and PS; 8BitDo: hold Start and the mode button; Switch Pro: hold the sync button), tap Pair, pick it in the list, then come back here.'
+        : 'Pair the controller in your phone or computer Bluetooth settings first, then press any button on it so the browser notices it.')));
+    b.append(sec('Gamepad buttons', h('div', { class: 'note', style: { marginBottom: '6px' } }, 'Tap a binding, then press the controller button. The left stick also drives the D-pad.'), padBox,
+      h('button', { class: 'btn small', onclick: () => { S.pad = structuredClone(DEFAULT_PAD); saveSettings(); draw(); } }, 'Reset gamepad')));
     b.append(sec('Keyboard', h('div', { class: 'note', style: { marginBottom: '6px' } }, 'Tap a binding, then press the new key. Delete clears all keys for that action. Esc cancels.'), kbBox,
       h('button', { class: 'btn small', onclick: () => { S.keys = structuredClone(DEFAULT_KEYS); saveSettings(); draw(); } }, 'Reset keyboard')));
-    b.append(sec('Gamepad', h('div', { class: 'note', style: { marginBottom: '6px' } }, 'Standard layout pads work out of the box. The left stick also drives the D-pad.'), padBox,
-      h('button', { class: 'btn small', onclick: () => { S.pad = structuredClone(DEFAULT_PAD); saveSettings(); draw(); } }, 'Reset gamepad')));
   },
 
   /* ---------------- SYSTEM ---------------- */
