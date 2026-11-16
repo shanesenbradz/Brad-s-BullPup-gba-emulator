@@ -25,7 +25,7 @@ const DEFAULTS = {
   // look
   theme: 'graphite', accent: 'brass', grid: 'regular', motion: 'full', skin: 'gunmetal', texture: 'auto', btnStyle: 'console', press: 'subtle', labels: true,
   click: 'off', clickVol: 1, haptic: 'light', ambient: 'subtle', bezel: false, glass: false, led: true,
-  shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0, vinyl: 'soft', saveLights: false,
+  shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0, vinyl: 'soft', saveLights: true,
   // system
   autoResume: true, autoSaveSec: 30, pauseOnMenu: true, pauseHidden: true, skipBios: true, idle: 'remove', opposing: false, wakeLock: true, slot: 1,
 };
@@ -35,6 +35,7 @@ const S = (() => {
   const s = Object.assign(structuredClone(DEFAULTS), saved);
   if (!s.v || s.v < 3) { s.btnStyle = 'console'; s.shell = true; s.v = 3; } // 1.3: molded console look by default
   if (s.v < 4) { const P = s.layout && s.layout.portrait; if (P) for (const k of ['rw', 'menu', 'ff']) delete P[k]; s.v = 4; } // respace hotkeys for button wells
+  if (s.v < 5) { s.saveLights = true; s.v = 5; } // 1.5: auto save lights on for everyone
   return s;
 })();
 let _saveT = 0;

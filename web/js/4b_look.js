@@ -61,9 +61,37 @@ function clickSound(kind = S.click) {
   else if (kind === 'thock') { tone('triangle', 230, 85, 0.05, 0.22 * vol); noise('bandpass', 1300, 0.12 * vol); }
   else if (kind === 'membrane') { noise('lowpass', 900, 0.35 * vol); tone('sine', 140, 70, 0.03, 0.12 * vol); }
 }
+/* Haptics, in order of preference:
+   1. Android app: the native bridge (WebView ignores navigator.vibrate, which is why some phones felt nothing)
+   2. Browsers with the Vibration API (Chrome on Android). Pulses under ~10 ms are too short for many
+      coin motors to spin up, so the levels start at 12 ms.
+   3. iOS 18 Safari has no Vibration API, but toggling a native switch input plays the system tick. */
+const HAPTIC_MS = { off: 0, light: 12, medium: 22, strong: 38 };
+let _iosTick = null, _hapticLast = 0;
+function iosTick() {
+  if (!_iosTick) {
+    const l = document.createElement('label'), i = document.createElement('input');
+    i.type = 'checkbox'; i.setAttribute('switch', ''); l.appendChild(i);
+    l.style.cssText = 'position:fixed;left:-99px;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
+    l.setAttribute('aria-hidden', 'true'); document.body.appendChild(l); _iosTick = l;
+  }
+  _iosTick.click();
+}
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function haptic(level = S.haptic) {
+  const ms = HAPTIC_MS[level] || 0; if (!ms) return;
+  const now = performance.now(); if (now - _hapticLast < 25) return; // sliding across buttons shouldn't buzz continuously
+  _hapticLast = now;
+  const A = window.CalzoneAndroid;
+  try {
+    if (A && A.haptic) return void A.haptic(level);
+    if (A && A.vibrate) return void A.vibrate(ms);
+    if (navigator.vibrate && navigator.vibrate(ms)) return;
+    if (IS_IOS) iosTick();
+  } catch (e) {}
+}
 function feedback() {
-  const ms = { off: 0, light: 6, medium: 12, strong: 22 }[S.haptic] || 0;
-  if (ms) navigator.vibrate?.(ms);
+  haptic();
   clickSound();
 }
 

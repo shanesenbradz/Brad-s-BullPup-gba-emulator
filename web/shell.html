@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Brad's Bullpup: a Game Boy Advance, Game Boy and Game Boy Color emulator built on mGBA. Runs offline in the browser.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="pwa/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="pwa/icon-192.png">
 <title>Brad's Bullpup</title>
 <style>/*CSS*/</style>
 </head>
@@ -42,6 +48,7 @@
   <div id="body"><div id="wall"></div><canvas id="vinyl"></canvas><div id="shade"></div><div class="save-leds" id="saveLeds" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="pill-led"><span class="led" id="plateLed"></span><svg viewBox="0 0 24 24"><path d="M12 3v8M6.3 7a8 8 0 1 0 11.4 0"/></svg></div><div class="grille"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="decal" id="decal"></div><div class="plate">__GUN__<span>BRAD'S BULLPUP  ·  <span id="plateSN">SN 00000000</span></span></div></div>
   <div id="amb"></div>
   <div id="stage"><div id="screenWrap"><span class="led" id="bezLed"></span><canvas id="screen" width="240" height="160"></canvas></div><div id="logoStrip">__GUN__<span>Brad's Bullpup</span></div></div>
+  <div class="save-leds land" id="saveLedsL" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div id="hud"><span id="hudSpeed"></span><span id="hudFps"></span><span id="hudRec" class="hidden">REC</span></div>
   <div id="overlay"></div>
   <div id="editBar" class="hidden">
@@ -73,7 +80,11 @@
 <input type="file" id="fileIn" multiple hidden>
 
 <script>/*MGBA_JS*/</script>
-<script>const WASM_B64="__WASM__";const GUN_SVG='__GUNJS__';const SPRITES=__SPRITES__;</script>
+<script>const APP_VERSION="__VERSION__";const WASM_B64="__WASM__";const GUN_SVG='__GUNJS__';const SPRITES=__SPRITES__;</script>
 <script>/*APP_JS*/</script>
+<script>
+// On the web (GitHub Pages) a service worker keeps the app working offline after the first visit.
+if ('serviceWorker' in navigator && location.protocol === 'https:' && !window.CalzoneAndroid) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
 </body>
 </html>

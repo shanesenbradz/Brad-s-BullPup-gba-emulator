@@ -75,14 +75,18 @@ const Emu = {
     this.saveLeds();
   },
   saveLeds(fire) {
-    const box = document.getElementById('saveLeds'); if (!box) return;
+    const boxes = ['saveLeds', 'saveLedsL'].map(id => document.getElementById(id)).filter(Boolean); if (!boxes.length) return;
     const on = S.saveLights && S.autoResume;
-    box.classList.toggle('on', on); if (!on) { this._ledN = -1; return; }
-    if (fire) { box.classList.add('fire'); this._ledN = 6; [...box.children].forEach(i => i.classList.add('lit')); clearTimeout(this._fireT); this._fireT = setTimeout(() => { box.classList.remove('fire'); this._ledN = -1; this.saveLeds(); }, 650); return; }
-    if (box.classList.contains('fire')) return;
+    $('#player').classList.toggle('leds-on', on);
+    boxes.forEach(b => b.classList.toggle('on', on)); if (!on) { this._ledN = -1; return; }
+    if (fire) {
+      this._ledN = 6; boxes.forEach(b => { b.classList.add('fire'); [...b.children].forEach(i => i.classList.add('lit')); });
+      clearTimeout(this._fireT); this._fireT = setTimeout(() => { boxes.forEach(b => b.classList.remove('fire')); this._ledN = -1; this.saveLeds(); }, 650); return;
+    }
+    if (boxes[0].classList.contains('fire')) return;
     const n = Math.min(5, Math.floor(this.autoT / (Math.max(10, S.autoSaveSec) * 1000) * 6));
     if (n === this._ledN) return; this._ledN = n;
-    [...box.children].forEach((i, k) => i.classList.toggle('lit', k < n));
+    boxes.forEach(b => [...b.children].forEach((i, k) => i.classList.toggle('lit', k < n)));
   },
   thumb() { try { return frameToCanvas(core.video()).toDataURL('image/jpeg', 0.82); } catch (e) { return null; } },
   async autoState() {

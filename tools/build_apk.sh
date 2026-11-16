@@ -6,7 +6,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 TC=.toolchain; B=build
-VC=${VC:-5}; VN=${VN:-1.4}
+VC=${VC:-6}; VN=${VN:-1.5}; TARGET=${TARGET:-36}
 if [ ! -d $TC/minapk ]; then
   mkdir -p $TC && (cd $TC && npm pack @drxiaozhi/minapk@0.5.1 aaptjs3@2.0.2 >/dev/null)
   mkdir -p $TC/minapk $TC/aapt && tar xzf $TC/drxiaozhi-minapk-*.tgz -C $TC/minapk && tar xzf $TC/aaptjs3-*.tgz -C $TC/aapt
@@ -14,12 +14,12 @@ fi
 T=$TC/minapk/package/tools; AJ=$T/android.jar
 case "$(uname -s)" in Darwin) AAPT2=$TC/aapt/package/bin/x64/darwin/aapt2;; *) AAPT2=$TC/aapt/package/bin/x64/linux/aapt2;; esac
 chmod +x "$AAPT2"
-[ -f dist/Brads_Bullpup.html ] || python3 tools/bundle.py
+VN=$VN python3 tools/bundle.py
 rm -rf $B; mkdir -p $B/assets $B/classes $B/dex
 cp dist/Brads_Bullpup.html $B/assets/index.html
 "$AAPT2" compile --dir android/res -o $B/res.zip
 "$AAPT2" link -I $AJ --manifest android/AndroidManifest.xml -o $B/base.apk -A $B/assets \
-  --min-sdk-version 24 --target-sdk-version 33 --version-code $VC --version-name $VN --java $B/gen $B/res.zip
+  --min-sdk-version 24 --target-sdk-version $TARGET --version-code $VC --version-name $VN --java $B/gen $B/res.zip
 # ecj, because d8 8.2 rejects the MethodParameters attribute newer javac versions emit
 java -jar $T/ecj-3.45.0.jar -8 -nowarn -cp $AJ -d $B/classes $(find android/src $B/gen -name '*.java')
 java -cp $T/d8.jar com.android.tools.r8.D8 --release --min-api 24 --lib $AJ --output $B/dex $(find $B/classes -name '*.class')

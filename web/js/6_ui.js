@@ -39,6 +39,14 @@ addEventListener('popstate', () => {
   if (!$('#sheet').classList.contains('hidden')) { Sheet.close(); history.pushState({ p: 1 }, ''); return; }
   Emu.stop();
 });
+// Called by the Android shell for the back gesture. Returns true when the page used it.
+window.bullpupBack = () => {
+  if (!$('#dlgWrap').classList.contains('hidden')) { $('#dlgWrap').click(); return true; }
+  if (Touch.editing) { Touch.endEdit(); return true; }
+  if (!$('#sheet').classList.contains('hidden')) { Sheet.close(); return true; }
+  if (Emu.active) { Emu.stop(); return true; }
+  return false;
+};
 
 /* ============================================================
    Library
@@ -413,7 +421,7 @@ const Panels = {
         h('button', { class: 'btn primary', onclick: () => exportBackup(inc.checked) }, 'Export backup'),
         h('button', { class: 'btn', onclick: importBackup }, 'Import backup')),
     ));
-    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> 1.4. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own.` })));
+    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> ${APP_VERSION}. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own. Nothing is collected or sent anywhere: your games, saves and settings stay on this device. <a href="https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/privacy.html" target="_blank" rel="noopener">Privacy policy</a>` })));
   },
 };
 

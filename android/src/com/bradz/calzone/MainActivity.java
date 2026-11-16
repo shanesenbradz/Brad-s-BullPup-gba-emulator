@@ -3,6 +3,7 @@ package com.bradz.calzone;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -35,7 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Calzone Advance shell: a full-screen WebView that serves the bundled page from
+ * Brad's Bullpup shell: a full-screen WebView that serves the bundled page from
  * https://appassets.androidplatform.net/ (a secure origin, so IndexedDB, AudioWorklet
  * and crypto all behave like in Chrome), plus a file picker and a save-to-Downloads bridge.
  */
@@ -127,6 +128,13 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Android 13+ predictive back. From targetSdk 36 onBackPressed() is no longer called, so the
+        // back gesture is routed through an OnBackInvokedCallback that asks the page first.
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
+        }
+
         if (saved != null) web.restoreState(saved);
         else web.loadUrl("https://" + HOST + "/index.html");
     }
@@ -193,8 +201,15 @@ public class MainActivity extends Activity {
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        handleBack();
+    }
+
+    /** Lets the page close an open sheet or leave a game first; if it doesn't handle back, the app goes to the background. */
+    private void handleBack() {
+        if (web == null) { finish(); return; }
+        web.evaluateJavascript("(window.bullpupBack && window.bullpupBack()) ? 1 : 0", r -> {
+            if (!"1".equals(r)) moveTaskToBack(true);
+        });
     }
 
     @Override
@@ -266,12 +281,74 @@ public class MainActivity extends Activity {
             }
         }
 
+        private android.os.Vibrator vib;
+        private Boolean predefinedOk;
+
+        @SuppressWarnings("deprecation")
+        private android.os.Vibrator vibrator() {
+            if (vib != null) return vib;
+            if (Build.VERSION.SDK_INT >= 31) {
+                android.os.VibratorManager m = (android.os.VibratorManager) a.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+                if (m != null) vib = m.getDefaultVibrator();
+            }
+            if (vib == null) vib = (android.os.Vibrator) a.getSystemService(Context.VIBRATOR_SERVICE);
+            return vib;
+        }
+
+        /** Legacy entry point kept for pages built before 1.5. */
         @JavascriptInterface
         public void vibrate(int ms) {
+            haptic(ms >= 30 ? "strong" : ms >= 18 ? "medium" : "light");
+        }
+
+        /**
+         * Button-press haptics. The old version called Vibrator.vibrate(6ms), which is below what many
+         * motors can play, was filtered on Android 13+ when "touch vibration" was off, and was never
+         * called by the page anyway. This tries, in order: a tuned predefined click (API 29+), a
+         * one-shot with explicit amplitude (API 26+), then a plain pulse, all tagged as game haptics so
+         * they follow the media vibration setting instead of the touch one.
+         */
+        @JavascriptInterface
+        @SuppressWarnings("deprecation")
+        public void haptic(String level) {
             try {
-                android.os.Vibrator v = (android.os.Vibrator) a.getSystemService(VIBRATOR_SERVICE);
-                if (v != null) v.vibrate(ms);
-            } catch (Exception ignored) { }
+                android.os.Vibrator v = vibrator();
+                if (v == null || !v.hasVibrator()) { viewHaptic(); return; }
+                int ms = "strong".equals(level) ? 38 : "medium".equals(level) ? 22 : 14;
+                int amp = "strong".equals(level) ? 255 : "medium".equals(level) ? 190 : 120;
+                android.media.AudioAttributes aa = new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_GAME)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+                if (Build.VERSION.SDK_INT >= 29) {
+                    int id = "strong".equals(level) ? android.os.VibrationEffect.EFFECT_HEAVY_CLICK
+                            : "medium".equals(level) ? android.os.VibrationEffect.EFFECT_CLICK : android.os.VibrationEffect.EFFECT_TICK;
+                    if (predefinedOk == null) {
+                        predefinedOk = Build.VERSION.SDK_INT < 30
+                                || v.areAllEffectsSupported(android.os.VibrationEffect.EFFECT_TICK, android.os.VibrationEffect.EFFECT_CLICK,
+                                android.os.VibrationEffect.EFFECT_HEAVY_CLICK) == android.os.Vibrator.VIBRATION_EFFECT_SUPPORT_YES;
+                    }
+                    if (predefinedOk) { v.vibrate(android.os.VibrationEffect.createPredefined(id), aa); return; }
+                }
+                if (Build.VERSION.SDK_INT >= 26) {
+                    // Phones without amplitude control get a slightly longer pulse so it is felt at all
+                    if (!v.hasAmplitudeControl()) { amp = android.os.VibrationEffect.DEFAULT_AMPLITUDE; ms += 6; }
+                    v.vibrate(android.os.VibrationEffect.createOneShot(ms, amp), aa);
+                } else {
+                    v.vibrate(ms + 6);
+                }
+            } catch (Exception e) {
+                viewHaptic();
+            }
+        }
+
+        /** Last resort: the system's own keyboard-tap haptic on the WebView. */
+        @SuppressWarnings("deprecation")
+        private void viewHaptic() {
+            a.runOnUiThread(() -> {
+                View root = a.getWindow().getDecorView();
+                root.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                        android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+            });
         }
     }
 }
