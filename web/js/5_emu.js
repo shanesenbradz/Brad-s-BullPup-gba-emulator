@@ -30,7 +30,7 @@ const Emu = {
     $('#plateSN').textContent = 'SN ' + meta.crc;
     Touch.build(); this.layoutScreen();
     this.search = new RamSearch(core);
-    this.paused = false; this.userPaused = false; this.acc = 0; this.last = 0; this.playT = performance.now();
+    this.paused = false; this.userPaused = false; this.acc = 0; this.last = 0; this.playT = performance.now(); this.skip = 0; this.costMs = this.costN = 0;
     Audio_.flush(); Audio_.apply(S);
     this.autoT = 0; this.autoLast = performance.now(); this._ledN = -1;
     this.timers = [setInterval(() => this.persistSram(), 2500), setInterval(() => this.autoTick(), 250)];
@@ -127,7 +127,7 @@ const Emu = {
     let frames = 0;
     const audioOk = Audio_.running && this.audioClock(now);
     if (sp === 1 && audioOk) {
-      const deficit = Math.round(rate * 0.075) - Audio_.buffered;
+      const deficit = Math.round(rate * (LITE ? 0.1 : 0.075)) - Audio_.buffered;
       frames = deficit > 0 ? Math.ceil(deficit / (rate / fps)) : 0;
       frames = Math.min(frames, 4); this.acc = 0;
     } else {
@@ -138,25 +138,46 @@ const Emu = {
     }
     if (frames <= 0) return;
     const chopEvery = sp > 1 ? Math.round(sp) : 1;
-    let ran = 0;
+    let ran = 0, drew = false; const t0 = performance.now();
     for (let i = 0; i < frames; i++) {
       this.frameNo++;
       core.setKeys(this.inputMask());
       if (this.cheatOps.length && core.hasMem) runCheatOps(core, this.cheatOps, this.inputMask());
+      // Only the last frame of a catch-up batch is ever seen, so the ones before it skip drawing.
+      // Frame skip on top of that (Auto on slow phones) leaves out every 2nd, 3rd or 4th picture.
+      const draw = i === frames - 1 && this.drawThisFrame();
       if (Link.active) {
         // the link can pause us mid-frame until the other phone answers; linkKick resumes it
         if (Link.runFrame() !== 1) { this.linkStalled = true; core.drainAudio((c, n) => Audio_.push(c, n)); break; }
         this.linkStalled = false;
-      } else core.frame();
+      } else { core.frame(draw); if (draw) drew = true; }
       ran++;
       if (sp > 1 && (S.ffAudio === 'mute' || this.frameNo % chopEvery)) core.drainAudio(null);
       else core.drainAudio((c, n) => Audio_.push(c, n));
       if (this.rw && !Link.active && this.frameNo % S.rewindEvery === 0) this.rw.capture(core);
     }
     if (!ran) return;
-    renderer.draw(core.video(), S);
-    if (S.ambient !== 'off' && (this._ambN = (this._ambN || 0) + 1) % 8 === 0) sampleAmbient();
+    if (drew || Link.active) {
+      renderer.draw(core.video(), S);
+      if (S.ambient !== 'off' && (this._ambN = (this._ambN || 0) + 1) % 8 === 0) sampleAmbient();
+    }
+    this.costMs += performance.now() - t0; this.costN += ran;
     this.countFps(now, ran);
+  },
+  // frame skip: 0 draws every frame; Auto picks 0 to 3 from how long frames take on this phone
+  skip: 0, _skipC: 0, costMs: 0, costN: 0,
+  drawThisFrame() {
+    const n = S.frameskip === 'auto' ? this.skip : +S.frameskip || 0;
+    if (n <= 0 || this.speed() < 1 || Link.active) { this._skipC = 0; return true; }
+    this._skipC = (this._skipC + 1) % (n + 1);
+    return this._skipC === 0;
+  },
+  tuneSkip() {
+    const per = this.costN ? this.costMs / this.costN : 0; this.costMs = this.costN = 0; this.frameMs = per;
+    if (S.frameskip !== 'auto' || !per || this.speed() !== 1) return;
+    // a frame has about 16.7 ms; leave room for the browser to show the picture and play sound
+    if (per > 12.5 && this.skip < 3) this.skip++;
+    else if (per < 7 && this.skip > 0) this.skip--;
   },
   // An answer from the other phone arrived: carry on with the frame straight away instead of
   // waiting for the next screen refresh, which keeps link-heavy screens (trades) moving.
@@ -193,12 +214,13 @@ const Emu = {
   },
   countFps(now, n) {
     this.fpsN += n;
-    if (now - this.fpsT >= 1000) { this.fps = this.fpsN * 1000 / (now - this.fpsT); this.fpsN = 0; this.fpsT = now; this.hud(); }
+    if (now - this.fpsT >= 1000) { this.fps = this.fpsN * 1000 / (now - this.fpsT); this.fpsN = 0; this.fpsT = now; this.tuneSkip(); this.hud(); }
   },
   hud() {
     const sp = this.speed();
     $('#hudSpeed').textContent = this.paused && this.userPaused ? 'PAUSED' : Link.active ? 'LINK' : this.rewinding ? '<< REWIND' : sp > 1 ? `>> ${sp}x` : sp < 1 ? `${sp}x` : '';
-    $('#hudFps').textContent = S.showFps ? `${this.fps.toFixed(0)} fps` : '';
+    const sk = S.frameskip === 'auto' ? this.skip : +S.frameskip || 0;
+    $('#hudFps').textContent = S.showFps ? `${this.fps.toFixed(0)} fps${sk ? '  ·  skip ' + sk : ''}` : '';
     this.updateLed();
   },
   updateLed() {
@@ -319,9 +341,10 @@ const Emu = {
     const chunks = [];
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     rec.onstop = () => { const blob = new Blob(chunks, { type: rec.mimeType }); download(`${safeName(this.game?.name || 'clip')}-${stamp()}.${rec.mimeType.includes('mp4') ? 'mp4' : 'webm'}`, blob); toast('Clip saved'); };
+    renderer.hires = true; this.layoutScreen();
     rec.start(1000); this.rec = rec; $('#hudRec').classList.remove('hidden'); this.updateLed(); toast('Recording. Open the menu to stop.');
   },
-  stopRecording() { if (!this.rec) return; this.rec.stop(); this.rec = null; $('#hudRec').classList.add('hidden'); this.updateLed(); },
+  stopRecording() { if (!this.rec) return; this.rec.stop(); this.rec = null; renderer.hires = false; if (this.active) this.layoutScreen(); $('#hudRec').classList.add('hidden'); this.updateLed(); },
   async requestWake() { if (!S.wakeLock || !navigator.wakeLock) return; try { this.wake = await navigator.wakeLock.request('screen'); } catch (e) {} },
   releaseWake() { try { this.wake?.release(); } catch (e) {} this.wake = null; },
 };

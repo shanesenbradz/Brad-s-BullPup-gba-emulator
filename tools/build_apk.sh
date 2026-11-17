@@ -1,12 +1,16 @@
 #!/bin/bash
 # Builds dist/Brads_Bullpup.apk from dist/Brads_Bullpup.html without Android Studio.
+# LITE=1 builds Brad's Bullpup Lite (dist/Brads_Bullpup_Lite.apk, package com.bradz.calzone.lite).
 # Needs: Java 17+, Node/npm (to fetch the toolchain), Python 3, zip.
 # Signing: set KEYSTORE, KS_PASS and KS_ALIAS to use your own key. Without them a new key
 # is made in keys/ (git-ignored). Updates only install over a build signed with the same key.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 TC=.toolchain; B=build
-VC=${VC:-8}; VN=${VN:-1.7}; TARGET=${TARGET:-36}
+LITE=${LITE:-0}
+if [ "$LITE" = 1 ]; then VC=${VC:-1}; VN=${VN:-1.0}; NAME=Brads_Bullpup_Lite; MANIFEST=android/AndroidManifest.lite.xml
+else VC=${VC:-9}; VN=${VN:-1.8}; NAME=Brads_Bullpup; MANIFEST=android/AndroidManifest.xml; fi
+TARGET=${TARGET:-36}
 if [ ! -d $TC/minapk ]; then
   mkdir -p $TC && (cd $TC && npm pack @drxiaozhi/minapk@0.5.1 aaptjs3@2.0.2 >/dev/null)
   mkdir -p $TC/minapk $TC/aapt && tar xzf $TC/drxiaozhi-minapk-*.tgz -C $TC/minapk && tar xzf $TC/aaptjs3-*.tgz -C $TC/aapt
@@ -14,11 +18,13 @@ fi
 T=$TC/minapk/package/tools; AJ=$T/android.jar
 case "$(uname -s)" in Darwin) AAPT2=$TC/aapt/package/bin/x64/darwin/aapt2;; *) AAPT2=$TC/aapt/package/bin/x64/linux/aapt2;; esac
 chmod +x "$AAPT2"
-VN=$VN python3 tools/bundle.py
+LITE=$LITE VN=$VN python3 tools/bundle.py
 rm -rf $B; mkdir -p $B/assets $B/classes $B/dex
-cp dist/Brads_Bullpup.html $B/assets/index.html
-"$AAPT2" compile --dir android/res -o $B/res.zip
-"$AAPT2" link -I $AJ --manifest android/AndroidManifest.xml -o $B/base.apk -A $B/assets \
+cp dist/$NAME.html $B/assets/index.html
+mkdir -p $B/res && cp -r android/res/. $B/res/
+[ "$LITE" = 1 ] && cp -r android/res-lite/. $B/res/
+"$AAPT2" compile --dir $B/res -o $B/res.zip
+"$AAPT2" link -I $AJ --manifest $MANIFEST -o $B/base.apk -A $B/assets \
   --min-sdk-version 24 --target-sdk-version $TARGET --version-code $VC --version-name $VN --java $B/gen $B/res.zip
 # ecj, because d8 8.2 rejects the MethodParameters attribute newer javac versions emit
 java -jar $T/ecj-3.45.0.jar -8 -nowarn -cp $AJ -d $B/classes $(find android/src $B/gen -name '*.java')
@@ -30,5 +36,5 @@ if [ -z "${KEYSTORE:-}" ]; then
   KEYSTORE=keys/bullpup.jks; KS_PASS=${KS_PASS:-changeit}; KS_ALIAS=${KS_ALIAS:-bullpup}
   [ -f $KEYSTORE ] || { mkdir -p keys; keytool -genkeypair -keystore $KEYSTORE -storepass $KS_PASS -keypass $KS_PASS -alias $KS_ALIAS -keyalg RSA -keysize 2048 -validity 36500 -dname "CN=Brad's Bullpup"; }
 fi
-java -jar $T/apksigner.jar sign --ks "$KEYSTORE" --ks-pass pass:$KS_PASS --ks-key-alias $KS_ALIAS --key-pass pass:$KS_PASS --min-sdk-version 24 --out dist/Brads_Bullpup.apk $B/aligned.apk
-java -jar $T/apksigner.jar verify dist/Brads_Bullpup.apk && echo "dist/Brads_Bullpup.apk is signed and ready"
+java -jar $T/apksigner.jar sign --ks "$KEYSTORE" --ks-pass pass:$KS_PASS --ks-key-alias $KS_ALIAS --key-pass pass:$KS_PASS --min-sdk-version 24 --out dist/$NAME.apk $B/aligned.apk
+java -jar $T/apksigner.jar verify dist/$NAME.apk && echo "dist/$NAME.apk is signed and ready"

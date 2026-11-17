@@ -146,16 +146,48 @@ const rng = (key, min, max, step, on, fmt = v => v) => {
   return h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', width: '55%', justifyContent: 'flex-end' } }, r, out);
 };
 const row = (t, d, ctl) => h('div', { class: 'row' + (ctl ? '' : ' head') }, h('div', null, h('div', { class: 't' }, t), d ? h('div', { class: 'd' }, d) : null), ctl);
-const sec = (title, ...kids) => {
-  const box = h('div', { class: 'sec' }, title ? h('h3', null, title) : null); let grp = null;
+// Sections fold shut so the long settings lists stay easy to scan. A closed section only shows
+// its title bar; tap it to open. What you open or close is remembered per tab and section.
+let _fold = {}; try { _fold = JSON.parse(localStorage.getItem('bullpup.fold') || '{}'); } catch (e) {}
+const FOLD_OPEN = new Set(['look:Preview']); // open until the user closes it
+const foldKey = title => (Sheet.tab || '') + ':' + String(title).split('  ·  ')[0];
+const saveFold = () => { try { localStorage.setItem('bullpup.fold', JSON.stringify(_fold)); } catch (e) {} };
+const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.6 5.4 1.4-1.4 8 8-8 8-1.4-1.4 6.6-6.6z"/></svg>';
+function setFold(box, open, remember = true) {
+  box.classList.toggle('closed', !open);
+  box.querySelector(':scope>.sec-h')?.setAttribute('aria-expanded', String(open));
+  if (remember) { _fold[box.dataset.fold] = open; saveFold(); }
+  if (open && box.querySelector('.pv') && typeof refreshPreviewVinyl === 'function') requestAnimationFrame(() => refreshPreviewVinyl(_pv));
+}
+// force: true keeps the section open no matter what was saved (used while a link is live)
+const secF = (title, force, ...kids) => {
+  const box = h('div', { class: 'sec' }); let grp = null, body = box;
+  if (title) {
+    const k = foldKey(title); box.dataset.fold = k; box.classList.add('fold');
+    const open = force || (k in _fold ? _fold[k] : FOLD_OPEN.has(k));
+    const head = h('button', { class: 'sec-h', type: 'button', 'aria-expanded': String(open), onclick: () => setFold(box, box.classList.contains('closed')) },
+      h('span', null, title), h('span', { class: 'chev', html: CHEVRON }));
+    body = h('div', { class: 'sec-body' });
+    box.append(head, body); if (!open) box.classList.add('closed');
+  }
   for (const k of kids.flat()) {
     if (!k) continue;
-    if (k.classList && (k.classList.contains('note') || k.classList.contains('btns') || k.classList.contains('bare') || k.classList.contains('btn'))) { grp = null; box.append(k); continue; }
-    if (!grp) { grp = h('div', { class: 'group' }); box.append(grp); }
+    if (k.classList && (k.classList.contains('note') || k.classList.contains('btns') || k.classList.contains('bare') || k.classList.contains('btn'))) { grp = null; body.append(k); continue; }
+    if (!grp) { grp = h('div', { class: 'group' }); body.append(grp); }
     grp.append(k);
   }
   return box;
 };
+const sec = (title, ...kids) => secF(title, false, ...kids);
+// "Open all / Close all" at the top of every tab
+function foldBar(b) {
+  const btn = h('button', { class: 'fold-all', type: 'button' });
+  const secs = () => [...b.querySelectorAll('.sec.fold')];
+  const label = () => { btn.textContent = secs().some(x => x.classList.contains('closed')) ? 'Open all' : 'Close all'; };
+  btn.onclick = () => { const open = secs().some(x => x.classList.contains('closed')); secs().forEach(x => setFold(x, open)); label(); };
+  b.addEventListener('click', e => { if (e.target.closest('.sec-h')) setTimeout(label, 0); });
+  const bar = h('div', { class: 'fold-bar' }, btn); bar._label = label; return bar;
+}
 const chips = (key, opts, on) => {
   const box = h('div', { class: 'chips' });
   const draw = () => { box.innerHTML = ''; for (const [v, l] of opts) box.append(h('button', { class: 'chip' + (S[key] === v ? ' act' : ''), onclick: () => { S[key] = v; saveSettings(); draw(); on && on(v); } }, l)); };
@@ -188,8 +220,9 @@ const Sheet = {
     const nav = $('#tabs'); nav.innerHTML = '';
     for (const [k, l] of this.tabs()) nav.append(h('button', { class: k === this.tab ? 'act' : '', onclick: () => { this.tab = k; this.render(); } }, l));
     const b = $('#sheetBody'); const top = b.scrollTop; b.innerHTML = '';
-    Panels[this.tab](b);
-    b.scrollTop = top;
+    const bar = foldBar(b); b.append(bar);
+    Promise.resolve(Panels[this.tab](b)).then(() => { bar._label(); b.scrollTop = top; });
+    bar._label(); b.scrollTop = top;
   },
 };
 
@@ -237,7 +270,7 @@ function linkPanel() {
     kids.push(note('Wi-Fi is faster and the best choice for trades. With no Wi-Fi around, turn on the hotspot on one phone and connect the other to it. For Bluetooth, pair the two phones in Android settings first. In Pokémon, both players then walk up to the Cable Club or Colosseum desk at the same time.'));
   }
   if (L.error) kids.push(h('div', { class: 'note link-err', style: { marginTop: '8px' } }, L.error));
-  return sec('Link cable', ...kids);
+  return secF('Link cable', (L.state && L.state !== 'off') || !!L.error, ...kids);
 }
 
 const Panels = {
@@ -249,11 +282,10 @@ const Panels = {
       h('button', { class: 'btn', onclick: async () => { if (await confirmD('Reset the game?', 'Unsaved progress since your last in-game save is lost. Your save file is kept.', 'Reset')) { Emu.reset(); Sheet.close(); } } }, 'Reset'),
       h('button', { class: 'btn', onclick: () => { Sheet.close(); Emu.stop(); } }, 'Exit to library'),
     )));
-    b.append(linkPanel());
     // speed
     b.append(sec('Speed',
       row('Fast forward', 'Also on the >> button, Space or R2', swRaw(Emu.ffToggle, () => Emu.hotkey('ff_toggle'))),
-      chips('ffSpeed', [[1.5, '1.5x'], [2, '2x'], [3, '3x'], [4, '4x'], [6, '6x'], [8, '8x'], [12, '12x']], () => Emu.hud()),
+      chips('ffSpeed', LITE ? [[1.5, '1.5x'], [2, '2x'], [3, '3x'], [4, '4x']] : [[1.5, '1.5x'], [2, '2x'], [3, '3x'], [4, '4x'], [6, '6x'], [8, '8x'], [12, '12x']], () => Emu.hud()),
       row('Slow motion', 'Audio slows down with it', swRaw(Emu.slow, v => { Emu.slow = v; Emu.hud(); })),
       chips('slowSpeed', [[0.25, '0.25x'], [0.5, '0.5x'], [0.75, '0.75x']]),
     ));
@@ -283,7 +315,7 @@ const Panels = {
     // tools
     b.append(sec('Tools', h('div', { class: 'btns' },
       h('button', { class: 'btn', onclick: () => Emu.screenshot() }, 'Screenshot'),
-      h('button', { class: 'btn' + (Emu.rec ? ' on' : ''), onclick: () => { Emu.toggleRecording(); Sheet.render(); } }, Emu.rec ? 'Stop recording' : 'Record clip'),
+      LITE ? null : h('button', { class: 'btn' + (Emu.rec ? ' on' : ''), onclick: () => { Emu.toggleRecording(); Sheet.render(); } }, Emu.rec ? 'Stop recording' : 'Record clip'),
       h('button', { class: 'btn', onclick: () => { Sheet.close(); Emu.hotkey('step'); toast('Paused. Use N or Frame advance to step'); } }, 'Frame advance'),
       window.CalzoneAndroid ? null : h('button', { class: 'btn', onclick: () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => toast('Fullscreen not available')); } }, 'Fullscreen'),
       h('button', { class: 'btn', onclick: () => { Sheet.close(); Touch.startEdit(); } }, 'Edit touch layout'),
@@ -292,6 +324,8 @@ const Panels = {
       h('button', { class: 'btn', onclick: async () => { await Emu.persistSram(); const s = core.sram(); s ? download(safeName(g.name) + '.sav', s) : toast('This game has no save memory'); } }, 'Export .sav'),
       h('button', { class: 'btn', onclick: async () => { const [f] = await pickFiles('.sav,.srm,.bin'); if (!f) return; if (!await confirmD('Replace save data?', 'The game will reset to load the imported save.', 'Import', true)) return; const d = await readBytes(f); core.loadSram(d, Emu.rom); await DB.put('saves', g.id, d); Emu.sramCrc = crc32(d); Emu.reset(); } }, 'Import .sav'),
     )));
+    // link cable last: most people never use it, so it sits at the bottom, folded shut
+    if (!LITE) b.append(linkPanel());
   },
 
   /* ---------------- CHEATS ---------------- */
@@ -353,7 +387,7 @@ const Panels = {
   },
 
   /* ---------------- LOOK ---------------- */
-  look(b) { lookPanel(b); this.video(b); },
+  look(b) { if (LITE) return liteLookPanel(b); lookPanel(b); this.video(b); },
   video(b) {
     b.append(sec('Screen shader', chips('shader', Object.entries(SHADERS).map(([k, v]) => [k, v.label]), redraw)));
     b.append(sec('Screen picture',
@@ -371,6 +405,14 @@ const Panels = {
 
   /* ---------------- AUDIO ---------------- */
   audio(b) {
+    if (LITE) {
+      b.append(sec('Output',
+        row('Volume', 'Up to 200%', rng('volume', 0, 2, 0.05, applyAudio, v => Math.round(v * 100) + '%')),
+        row('Mute', null, sw('mute', applyAudio)),
+        row('While fast forwarding', null, sel('ffAudio', [['chop', 'Play sped-up audio'], ['mute', 'Mute']])),
+        h('div', { class: 'note', style: { marginTop: '8px' } }, 'Lite sends the game sound straight to the speaker. The reverb, EQ and limiter from the full app are left out to save power.')));
+      return;
+    }
     b.append(sec('Output',
       row('Volume', 'Up to 200%. The limiter stops clipping.', rng('volume', 0, 2, 0.05, applyAudio, v => Math.round(v * 100) + '%')),
       row('Mute', null, sw('mute', applyAudio)),
@@ -448,6 +490,13 @@ const Panels = {
 
   /* ---------------- SYSTEM ---------------- */
   async system(b) {
+    const ms = Emu.active && Emu.frameMs ? `This game takes about ${Emu.frameMs.toFixed(1)} ms a frame here (16.7 ms is full speed)${S.frameskip === 'auto' ? `, skipping ${Emu.skip}` : ''}.` : null;
+    b.append(sec('Performance',
+      row('Frame skip', 'Leaves out some pictures when the phone falls behind. The game and sound keep full speed.', sel('frameskip', [['auto', 'Auto'], [0, 'Off'], [1, '1 of 2'], [2, '2 of 3'], [3, '3 of 4']], () => { Emu.skip = 0; Emu.hud(); })),
+      row('Show FPS', null, sw('showFps', () => Emu.hud())),
+      ms ? h('div', { class: 'note', style: { marginTop: '8px' } }, ms) : null,
+      LITE ? h('div', { class: 'note', style: { marginTop: '8px' } }, 'For the fastest picture use the Sharp or Smooth screen, with color correction and frame blending off. The phone\'s graphics chip then does the scaling.') : null,
+    ));
     b.append(sec('Behaviour',
       row('Resume where I left off', 'Saves a snapshot when you leave a game', sw('autoResume')),
       row('Auto snapshot every', null, sel('autoSaveSec', [[15, '15 s'], [30, '30 s'], [60, '1 min'], [300, '5 min']])),
@@ -457,8 +506,8 @@ const Panels = {
       row('Keep screen on', null, sw('wakeLock', v => v ? Emu.requestWake() : Emu.releaseWake())),
     ));
     b.append(sec('Rewind',
-      row('Enable rewind', 'Takes effect next time a game starts', sw('rewind')),
-      row('Memory for rewind', 'More memory, longer rewind', sel('rewindMB', [[24, '24 MB'], [48, '48 MB'], [64, '64 MB'], [128, '128 MB'], [256, '256 MB']])),
+      row('Enable rewind', LITE ? 'Off by default in Lite: it saves a snapshot every few frames. Takes effect next time a game starts.' : 'Takes effect next time a game starts', sw('rewind')),
+      row('Memory for rewind', 'More memory, longer rewind', sel('rewindMB', LITE ? [[16, '16 MB'], [24, '24 MB'], [48, '48 MB']] : [[24, '24 MB'], [48, '48 MB'], [64, '64 MB'], [128, '128 MB'], [256, '256 MB']])),
       row('Snapshot every', 'Fewer frames, smoother rewind', sel('rewindEvery', [[1, '1 frame'], [2, '2 frames'], [4, '4 frames'], [8, '8 frames']])),
       row('Rewind speed', null, sel('rewindRate', [[1, 'Normal'], [2, 'Fast'], [4, 'Very fast']])),
       Emu.active && Emu.rw ? h('div', { class: 'note' }, `Buffer: ${Emu.rw.count} steps, ${fmtBytes(Emu.rw.bytes)} used, about ${(Emu.rw.count * S.rewindEvery / 60).toFixed(0)} s of history`) : null,
@@ -480,10 +529,42 @@ const Panels = {
         h('button', { class: 'btn primary', onclick: () => exportBackup(inc.checked) }, 'Export backup'),
         h('button', { class: 'btn', onclick: importBackup }, 'Import backup')),
     ));
-    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup</b> ${APP_VERSION}. Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own. Nothing is collected or sent anywhere: your games, saves and settings stay on this device. <a href="https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/privacy.html" target="_blank" rel="noopener">Privacy policy</a>` })));
+    b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup${LITE ? ' Lite' : ''}</b> ${APP_VERSION}.${LITE ? ' The light edition for older phones: same mGBA core and saves, fewer extras.' : ''} Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own. Nothing is collected or sent anywhere: your games, saves and settings stay on this device. <a href="https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/privacy.html" target="_blank" rel="noopener">Privacy policy</a>` })));
   },
 };
 
+
+/* ---------------- Lite look panel ---------------- */
+function liteLookPanel(b) {
+  const L = () => { saveSettings(); applyLook(); };
+  b.append(sec('Appearance',
+    row('Theme', null, null), chips('theme', [['graphite', 'Graphite'], ['oled', 'OLED black'], ['light', 'Light']], applyLook),
+    row('Accent', ACCENTS[S.accent]?.[4], null),
+    (() => { const box = h('div', { class: 'swatches' }); for (const [k, a] of Object.entries(ACCENTS)) box.append(h('button', { class: 'swatch' + (S.accent === k ? ' act' : ''), style: { background: a[0] }, 'aria-label': a[4], title: a[4], onclick: () => { S.accent = k; L(); Sheet.render(); } })); return box; })(),
+    row('Library covers', null, null), chips('grid', [['compact', 'Compact'], ['regular', 'Regular'], ['large', 'Large']], applyLook),
+    row('Reduce motion', 'Turns off sheet and toast animations', swRaw(S.motion === 'reduce', v => { S.motion = v ? 'reduce' : 'full'; L(); })),
+  ));
+  b.append(sec('Controller',
+    (() => { const box = h('div', { class: 'skins' }); for (const [k, sk] of Object.entries(SKINS)) { const v = sk.v; box.append(h('button', { class: 'skin' + (S.skin === k ? ' act' : ''), onclick: () => { S.skin = k; L(); Sheet.render(); } }, h('span', { class: 'sw', style: { background: `linear-gradient(${v[0]},${v[1]})` } }, h('b', { style: { background: v[3] } })), sk.name)); } return box; })(),
+    row('Screen shell', 'A dark frame and logo strip around the screen', sw('shell', applyLook)),
+    row('Button style', null, null), chips('btnStyle', [['flat', 'Flat'], ['soft', 'Soft'], ['console', 'Console']], applyLook),
+    row('Opacity', 'How see-through the on-screen buttons are', rng('ctlOpacity', 0.05, 1, 0.05, () => Emu.active && Touch.setOpacity(), v => Math.round(v * 100) + '%')),
+    row('Show labels', null, sw('labels', applyLook)),
+    row('Power LED', null, sw('led', applyLook)),
+    row('Vibration', null, null), chips('haptic', [['off', 'Off'], ['light', 'Light'], ['medium', 'Medium'], ['strong', 'Strong']], () => feedback()),
+    row('Click sound', null, null), chips('click', [['off', 'Off'], ['soft', 'Soft tick'], ['clicky', 'Clicky']], v => Audio_.ctx.resume().then(() => clickSound(v))),
+  ));
+  b.append(sec('Screen',
+    row('Picture', 'Sharp and Smooth are the fastest', null),
+    chips('shader', ['sharp', 'smooth', 'lcd', 'scan', 'dmg'].map(k => [k, SHADERS[k].label]), redraw),
+    row('GBA color correction', 'Matches the duller real screen', sw('colorFix', redraw)),
+    row('Frame blending', 'Fixes flicker transparency effects', sw('blend', redraw)),
+    row('Aspect', null, sel('aspect', [['native', 'Original'], ['4:3', '4:3'], ['stretch', 'Stretch to fit']], redraw)),
+    row('Integer scaling', 'Even pixels, may leave borders', sw('integer', redraw)),
+    row('Brightness', null, rng('brightness', 0.5, 1.6, 0.05, redraw, v => Math.round(v * 100) + '%')),
+    h('div', { class: 'btns', style: { marginTop: '8px' } }, h('button', { class: 'btn small', onclick: () => { for (const k of ['theme', 'accent', 'grid', 'motion', 'skin', 'shell', 'btnStyle', 'ctlOpacity', 'labels', 'led', 'haptic', 'click', 'shader', 'colorFix', 'blend', 'aspect', 'integer', 'brightness']) S[k] = structuredClone(DEFAULTS[k]); L(); redraw(); Sheet.render(); } }, 'Reset look')),
+  ));
+}
 
 /* ---------------- Look panel ---------------- */
 function lookPanel(b) {

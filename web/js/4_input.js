@@ -28,18 +28,26 @@ const DEFAULTS = {
   shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0, vinyl: 'soft', saveLights: true,
   // system
   autoResume: true, autoSaveSec: 30, pauseOnMenu: true, pauseHidden: true, skipBios: true, idle: 'remove', opposing: false, wakeLock: true, slot: 1,
+  // performance: 'auto' or how many frames to skip drawing between drawn ones
+  frameskip: 0,
 };
+// Lite: built for older, slower phones. Light defaults, and the heavy extras are off for good.
+const LITE_DEFAULTS = { frameskip: 'auto', rewind: false, rewindMB: 24, rewindEvery: 4, btnStyle: 'flat', press: 'none', shell: false, gloss: 'matte', saveLights: false, ffSpeed: 2 };
+const LITE_LOCKED = { ambient: 'off', wall: false, vinyl: 'off', glass: false, bezel: false, grille: false, decal: 'none', texture: 'matte', reverb: 'off', bass: 0, mid: 0, treble: 0, speaker: false, width: 1 };
+if (LITE) Object.assign(DEFAULTS, LITE_DEFAULTS, LITE_LOCKED);
+const SETTINGS_KEY = LITE ? 'bullpup.lite.settings' : 'calzone.settings';
 const S = (() => {
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem('calzone.settings') || '{}'); } catch (e) {}
+  try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (e) {}
   const s = Object.assign(structuredClone(DEFAULTS), saved);
   if (!s.v || s.v < 3) { s.btnStyle = 'console'; s.shell = true; s.v = 3; } // 1.3: molded console look by default
   if (s.v < 4) { const P = s.layout && s.layout.portrait; if (P) for (const k of ['rw', 'menu', 'ff']) delete P[k]; s.v = 4; } // respace hotkeys for button wells
-  if (s.v < 5) { s.saveLights = true; s.v = 5; } // 1.5: auto save lights on for everyone
+  if (s.v < 5) { s.saveLights = !LITE; s.v = 5; } // 1.5: auto save lights on for everyone
+  if (LITE) Object.assign(s, LITE_LOCKED);
   return s;
 })();
 let _saveT = 0;
-function saveSettings() { clearTimeout(_saveT); _saveT = setTimeout(() => { try { localStorage.setItem('calzone.settings', JSON.stringify(S)); } catch (e) {} }, 150); }
+function saveSettings() { clearTimeout(_saveT); _saveT = setTimeout(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(S)); } catch (e) {} }, 150); }
 
 /* ============================================================
    Input aggregator

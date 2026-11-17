@@ -13,13 +13,36 @@ No games are included. Load ROMs you dumped from cartridges you own.
 
 ## Install
 
-Download [Brads_Bullpup_1.7.apk](release/Brads_Bullpup_1.7.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
+Download [Brads_Bullpup_1.8.apk](release/Brads_Bullpup_1.8.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
 
-You can also skip the install and [run it in the browser](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/). It works offline after the first visit, and Chrome's "Add to Home screen" or "Install app" turns it into a full-screen app. [Brads_Bullpup_1.7.html](release/Brads_Bullpup_1.7.html?raw=1) is the same thing as one file you can keep on a phone or PC.
+You can also skip the install and [run it in the browser](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/). It works offline after the first visit, and Chrome's "Add to Home screen" or "Install app" turns it into a full-screen app. [Brads_Bullpup_1.8.html](release/Brads_Bullpup_1.8.html?raw=1) is the same thing as one file you can keep on a phone or PC.
 
 It runs on Android 7 and up.
 
-**Coming from 1.4 or older:** 1.5 and later are signed with a new long-term release key, so Android won't install it over 1.4. In 1.4 go to System and export a backup, uninstall 1.4, install 1.5 and import the backup. Every version from 1.5 on uses this key and updates in place, keeping your games, saves and states.
+### Brad's Bullpup Lite, for older phones
+
+If games stutter or the sound crackles on an older or cheaper phone, try [Brads_Bullpup_Lite_1.0.apk](release/Brads_Bullpup_Lite_1.0.apk?raw=1), or [the Lite web version](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/lite/). It's a separate app (Bullpup Lite, with a green LITE tag on the icon), so it installs next to the full one. Moving your games over takes one backup: export it in the full app under System, import it in Lite.
+
+Lite runs the same mGBA core and keeps cheats, save states, controllers, the touch layout editor, fast forward and .sav import and export. What changes:
+
+- Auto frame skip is on. When the phone can't draw every frame in time, it leaves out one picture in two, three or four, and the game and sound keep full speed. The menu shows how long a frame takes on your phone.
+- Skipped frames really are skipped inside the core: the scanline renderer is switched off for that frame while the game logic, timers and sound run as normal. That's about a third of the work of a GBA frame.
+- Sound goes straight to the speaker with a slightly bigger buffer. No EQ, reverb, widener or limiter running on the audio thread.
+- The screen is drawn at the game's own 240x160 and the phone's graphics chip scales it up (the full app does this now too, see below). Shaders are limited to the cheap ones: Sharp, Smooth, LCD grid, Scanlines and Pea soup.
+- No wallpaper, vinyl wrap, ambient glow, glass, grille, stickers, drop shadows or blur. Buttons are flat and don't animate, so a press doesn't repaint the screen.
+- Rewind is off by default and uses less memory when you turn it on. Clip recording and the link cable are left out.
+- On 90 and 120 Hz screens it asks Android for 60 Hz, since GBA games run at 60 fps anyway.
+
+**Coming from 1.7 or older:** 1.8 is signed with a new long-term release key (the old one was lost), so Android won't install it over an earlier version. In your current version go to System and export a backup, uninstall it, install 1.8 and import the backup. Lite 1.0 uses the same key. Every version from 1.8 on updates in place, keeping your games, saves and states.
+
+## What's new in 1.8
+
+- Every settings section folds shut, so the menus are easy to scan. Tap a section's title to open it, and the app remembers which ones you keep open. Open all and Close all sit at the top of each tab.
+- The link cable section moved to the bottom of the game menu and starts closed, since most games never use it. It opens by itself while you're hosting, joining or linked.
+- Faster on every phone: when the app has to run a few frames at once to catch up, only the last one is drawn. Before, slow phones drew pictures nobody saw, fell further behind and the sound crackled.
+- Sharp and Smooth screens are drawn at 240x160 and scaled up by the graphics chip, instead of running the colour shader on every screen pixel. Clips still record at full size.
+- New Performance section in System with frame skip (Off, Auto, or a fixed 1 to 3), and the time a frame takes on your phone.
+- The Android app keeps the game's renderer at foreground priority, so Android doesn't slow it down mid-game.
 
 ## What's new in 1.7
 
@@ -64,7 +87,8 @@ The Look tab is where I spent the most time. There are 11 controller skins, 5 bu
 web/          the app: shell.html, app.css, js/ (loaded in filename order)
 web/brand/    the pixel bullpup and sprite sheet, plus the Python that draws them
 vendor/mgba/  mgba.js and mgba.wasm, plus src/ with the wrapper and link driver they're built from (see SOURCE.md)
-android/      manifest, icons and MainActivity.java for the WebView shell
+android/      manifest, icons and MainActivity.java for the WebView shell (res-lite/ and AndroidManifest.lite.xml for Lite)
+web/lite/     Lite's extra stylesheet and icon
 tools/        bundle.py and build_apk.sh
 test/         a homebrew test ROM, its C source, and a Playwright end-to-end test
 dist/         the bundled single-file app
@@ -90,6 +114,9 @@ The Android side is a single activity, targeting API 36. It serves the page from
 ```
 python3 tools/bundle.py          # web/ + vendor/ -> dist/Brads_Bullpup.html and docs/ (GitHub Pages)
 ./tools/build_apk.sh             # dist/ -> dist/Brads_Bullpup.apk (sideload, com.bradz.calzone)
+LITE=1 python3 tools/bundle.py   # Lite: dist/Brads_Bullpup_Lite.html and docs/lite/
+LITE=1 ./tools/build_apk.sh      # dist/Brads_Bullpup_Lite.apk (com.bradz.calzone.lite)
+python3 tools/lite_icons.py      # Lite's launcher icons with the LITE tag
 ./tools/build_aab.sh             # dist/ -> dist/Brads_Bullpup_play.aab (Google Play, com.bradz.bullpup)
 python3 tools/store_assets.py    # web app icons and Play listing art
 ./tools/build_core.sh            # rebuilds vendor/mgba from source (needs Emscripten)

@@ -34,7 +34,7 @@ const REVERB_PRESETS = {
 class AudioOut {
   async init() {
     const AC = window.AudioContext || window.webkitAudioContext;
-    this.ctx = new AC({ latencyHint: 'interactive' });
+    this.ctx = new AC({ latencyHint: LITE ? 'balanced' : 'interactive' }); this.lite = LITE;
     const c = this.ctx;
     this.enq = 0; this.used = 0; this.rate = 32768; this.speed = 1;
     try {
@@ -62,6 +62,10 @@ class AudioOut {
         for (let i = 0; i < n; i++) { if (w - pos >= cap - 2) break; const j = (w % cap) * 2; buf[j] = m[i * 2] / 32768; buf[j + 1] = m[i * 2 + 1] / 32768; w++; }
       };
       this.sink = sp;
+    }
+    if (this.lite) {
+      // Lite: straight to the speaker, no EQ, reverb, widener or limiter running on the audio thread
+      this.master = c.createGain(); this.sink.connect(this.master).connect(c.destination); this.recDest = null; return;
     }
     // effects chain
     this.bass = c.createBiquadFilter(); this.bass.type = 'lowshelf'; this.bass.frequency.value = 180;
@@ -97,6 +101,7 @@ class AudioOut {
   apply(S) {
     const t = this.ctx.currentTime, set = (p, v) => p.setTargetAtTime(v, t, 0.02);
     set(this.master.gain, S.mute ? 0 : S.volume);
+    if (this.lite) return;
     set(this.bass.gain, S.bass); set(this.mid.gain, S.mid); set(this.treble.gain, S.treble);
     set(this.lp.frequency, S.speaker ? 3800 : 20000);
     this.lp.Q.value = S.speaker ? 1.6 : 0.5;
@@ -176,17 +181,25 @@ const SHADERS = {
     vec2 p = fract(uv * uTex); vec2 px = uTex / uOut; vec2 g = smoothstep(vec2(0.0), px, p) * smoothstep(vec2(0.0), px, 1.0 - p); c *= mix(0.8, 1.0, g.x * g.y);` },
 };
 
+// Sharp and Smooth draw the picture at the game's own size (240x160) and let the phone's
+// compositor (the GPU) scale it up to the screen, with image-rendering choosing nearest or
+// bilinear. The colour work then runs on 38 thousand pixels a frame instead of up to two
+// million. Shaders that need the full screen size (LCD grid, CRT...) render at screen size,
+// capped at 3x the game size in Lite. Recording a clip switches to full size so clips stay sharp.
+const NATIVE_SHADERS = new Set(['sharp', 'smooth']);
 class Renderer {
   constructor(canvas) {
-    this.cv = canvas; this.w = 0; this.h = 0;
-    const gl = canvas.getContext('webgl', { antialias: false, alpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+    this.cv = canvas; this.w = 0; this.h = 0; this.cssW = 240; this.cssH = 160; this.hires = false;
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
     this.gl = gl;
-    if (!gl) { this.ctx2d = canvas.getContext('2d'); return; }
+    if (!gl) { this.ctx2d = canvas.getContext('2d', { alpha: false }); return; }
     const vs = `attribute vec2 p; varying vec2 uv; void main(){ uv = p * 0.5 + 0.5; uv.y = 1.0 - uv.y; gl_Position = vec4(p, 0.0, 1.0); }`;
     this.vs = this._sh(gl.VERTEX_SHADER, vs);
     const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    this.texA = gl.createTexture(); this.texB = gl.createTexture();
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.DITHER);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    this.texA = gl.createTexture(); this.texB = gl.createTexture(); this._filt = -1; this._cur = null;
     this.progs = {};
   }
   _sh(type, src) { const gl = this.gl, s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
@@ -194,7 +207,7 @@ class Renderer {
     if (this.progs[name]) return this.progs[name];
     const gl = this.gl, def = SHADERS[name] || SHADERS.sharp;
     const fs = `precision mediump float; varying vec2 uv; uniform sampler2D uCur, uPrev; uniform vec2 uTex, uOut; uniform float uBlend, uCC, uBright, uSat, uContrast;
-      vec3 raw(vec2 u){ vec3 a = texture2D(uCur, u).rgb; vec3 b = texture2D(uPrev, u).rgb; return mix(a, b, uBlend * 0.5); }
+      vec3 raw(vec2 u){ vec3 a = texture2D(uCur, u).rgb; if (uBlend < 0.5) return a; vec3 b = texture2D(uPrev, u).rgb; return mix(a, b, 0.5); }
       vec3 tex(vec2 u){ vec3 c = raw(u);
         if (uCC > 0.5) { vec3 l = pow(c, vec3(2.2)); l = mat3(0.80,0.135,0.195, 0.275,0.64,0.155, -0.075,0.225,0.65) * l; c = pow(max(l * 0.94, 0.0), vec3(1.0/2.2)); }
         return c; }
@@ -207,9 +220,27 @@ class Renderer {
     this.progs[name] = o; return o;
   }
   setSize(cssW, cssH) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    this.cssW = cssW; this.cssH = cssH;
     this.cv.style.width = cssW + 'px'; this.cv.style.height = cssH + 'px';
-    if (this.gl) { this.cv.width = Math.round(cssW * dpr); this.cv.height = Math.round(cssH * dpr); }
+    this._sizeKey = '';
+  }
+  // backing-store size for this shader and frame
+  _fit(S, w, h) {
+    const native = NATIVE_SHADERS.has(S.shader) && !this.hires;
+    const key = [native, S.shader, w, h, this.cssW, this.cssH].join();
+    if (key === this._sizeKey) return;
+    this._sizeKey = key;
+    let bw, bh;
+    if (native) { bw = w; bh = h; }
+    else {
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      bw = Math.round(this.cssW * dpr); bh = Math.round(this.cssH * dpr);
+      if (LITE) { const k = Math.min(1, w * 3 / bw); bw = Math.round(bw * k); bh = Math.round(bh * k); }
+    }
+    if (this.cv.width !== bw) this.cv.width = bw;
+    if (this.cv.height !== bh) this.cv.height = bh;
+    // the GPU does the upscale: nearest for Sharp, bilinear for Smooth
+    this.cv.style.imageRendering = native && S.shader === 'sharp' ? 'pixelated' : 'auto';
   }
   draw(frame, S) {
     const { w, h, data } = frame;
@@ -220,25 +251,32 @@ class Renderer {
       return;
     }
     const gl = this.gl;
+    this._fit(S, w, h);
     const pr = this._prog(S.shader);
     const filt = pr.filter === 'linear' ? gl.LINEAR : gl.NEAREST;
-    // swap: previous frame lives in texB
-    const t = this.texA; this.texA = this.texB; this.texB = t;
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texA);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    if (w !== this.w || h !== this.h || !this._initA) {
+    // the previous frame is only kept (in texB) when frame blending needs it
+    if (S.blend) { const t = this.texA; this.texA = this.texB; this.texB = t; }
+    if (w !== this.w || h !== this.h) {
       for (const tx of [this.texA, this.texB]) { gl.bindTexture(gl.TEXTURE_2D, tx); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, data); }
-      this.w = w; this.h = h; this._initA = true; gl.bindTexture(gl.TEXTURE_2D, this.texA);
-    } else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
-    for (const [unit, tx] of [[0, this.texA], [1, this.texB]]) {
-      gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tx);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      this.w = w; this.h = h; this._filt = -1;
     }
+    if (filt !== this._filt) {
+      for (const tx of [this.texA, this.texB]) {
+        gl.bindTexture(gl.TEXTURE_2D, tx);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      }
+      this._filt = filt;
+    }
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texB);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texA);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
     gl.viewport(0, 0, this.cv.width, this.cv.height);
-    gl.useProgram(pr.p);
-    gl.enableVertexAttribArray(pr.loc); gl.vertexAttribPointer(pr.loc, 2, gl.FLOAT, false, 0, 0);
-    gl.uniform1i(pr.cur, 0); gl.uniform1i(pr.prev, 1);
+    if (this._cur !== pr) {
+      gl.useProgram(pr.p); this._cur = pr;
+      gl.enableVertexAttribArray(pr.loc); gl.vertexAttribPointer(pr.loc, 2, gl.FLOAT, false, 0, 0);
+      gl.uniform1i(pr.cur, 0); gl.uniform1i(pr.prev, 1);
+    }
     gl.uniform2f(pr.tex, w, h); gl.uniform2f(pr.out, this.cv.width, this.cv.height);
     gl.uniform1f(pr.blend, S.blend ? 1 : 0); gl.uniform1f(pr.cc, S.colorFix ? 1 : 0);
     gl.uniform1f(pr.bright, S.brightness); gl.uniform1f(pr.sat, S.saturation); gl.uniform1f(pr.con, S.contrast);

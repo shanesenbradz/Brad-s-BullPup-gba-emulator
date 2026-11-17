@@ -7,6 +7,8 @@
 - `src/mgba_shim.c`, the flat C API from wasm-gaming/mGBA-wasm
   (https://github.com/wasm-gaming/mGBA-wasm), with one change: video packing is split out of
   `mgbawasm_run_frame` so the link runner can reuse it
+- `mgbawasm_run_frame_skip` (end of `src/mgba_shim.c`), added in 1.8: runs a frame with mGBA's scanline
+  renderer off, through its own frameskip counter, for frame skip on slow phones
 - `src/bullpup_link.c`, Brad's Bullpup's network link cable driver for GBA multiplayer and
   normal modes and the Game Boy serial port
 

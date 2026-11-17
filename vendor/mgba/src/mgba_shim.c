@@ -458,3 +458,30 @@ EXPORT int mgbawasm_has_bios(void) {
 
 /* Brad's Bullpup additions */
 #include "bullpup_link.c"
+
+/*
+ * Frame skip for slow phones (Brad's Bullpup Lite, and catch-up frames in the full app).
+ * Runs one frame with the scanline renderer switched off: the game logic, timers, DMA,
+ * IRQs and sound all run exactly as normal, only the drawing of the picture is skipped,
+ * which is a large share of the work on a GBA frame. The last drawn picture stays in the
+ * buffer. Uses mGBA's own frameskip counter, so it is the same path mGBA's frameskip
+ * option takes and nothing in save states changes.
+ */
+EXPORT void mgbawasm_run_frame_skip(void) {
+	if (!core) {
+		return;
+	}
+	switch (core->platform(core)) {
+	case mPLATFORM_GBA:
+		((struct GBA*) core->board)->video.frameskipCounter = 1;
+		break;
+	case mPLATFORM_GB:
+		((struct GB*) core->board)->video.frameskipCounter = 1;
+		break;
+	default:
+		core->runFrame(core);
+		mgbawasm_pack_video();
+		return;
+	}
+	core->runFrame(core);
+}

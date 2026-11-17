@@ -83,6 +83,15 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        // Keep the page's renderer process at foreground priority so Android doesn't slow it down
+        // or reclaim it while a game runs, and skip Safe Browsing (the page is bundled, offline).
+        if (Build.VERSION.SDK_INT >= 26) {
+            web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
+            s.setSafeBrowsingEnabled(false);
+        }
+        // Lite: ask for a 60 Hz display mode. GBA games run at 60 fps, and on 90/120 Hz screens
+        // the phone would otherwise composite twice as many frames for nothing.
+        if (getPackageName().endsWith(".lite")) prefer60Hz();
 
         web.addJavascriptInterface(new Bridge(this), "CalzoneAndroid");
         link = new LinkManager(this);
@@ -166,6 +175,24 @@ public class MainActivity extends Activity {
     }
 
     @SuppressWarnings("deprecation")
+    private void prefer60Hz() {
+        if (Build.VERSION.SDK_INT < 23) return;
+        try {
+            android.view.Display d = getWindowManager().getDefaultDisplay();
+            android.view.Display.Mode cur = d.getMode(), best = null;
+            for (android.view.Display.Mode m : d.getSupportedModes()) {
+                if (m.getPhysicalWidth() != cur.getPhysicalWidth() || m.getPhysicalHeight() != cur.getPhysicalHeight()) continue;
+                if (m.getRefreshRate() < 59f) continue;
+                if (best == null || m.getRefreshRate() < best.getRefreshRate()) best = m;
+            }
+            if (best != null && best.getModeId() != cur.getModeId()) {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                lp.preferredDisplayModeId = best.getModeId();
+                getWindow().setAttributes(lp);
+            }
+        } catch (Exception ignored) { }
+    }
+
     private void immersive() {
         Window w = getWindow();
         if (Build.VERSION.SDK_INT >= 30) {

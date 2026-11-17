@@ -1,0 +1,12 @@
+/* Brad's Bullpup Lite: loaded after app.css. Old phone GPUs struggle with blur, drop-shadow
+   filters and big soft shadows, and the touch buttons repaint on every press, so all of that
+   goes. The game canvas sits on its own GPU layer so nothing around it repaints per frame. */
+*,*:before,*:after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+#overlay .ctl,#overlay .ctl *,.dpad,.dpad *{filter:none!important;transition:none!important;animation:none!important}
+#overlay .ctl .face,.dpad i,.dk .key{box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;background-image:none!important}
+#overlay .ctl.press .face,.dpad.p-up .dk.ku .key,.dpad.p-down .dk.kd .key,.dpad.p-left .dk.kl .key,.dpad.p-right .dk.kr .key{transform:none!important;opacity:.62}
+#screen{will-change:transform;transform:translateZ(0)}
+#stage{contain:layout paint}
+#amb,#wall,#vinyl,#shade,.grille,.decal{display:none!important}
+.sheet-body .sec.fold:not(.closed)>.sec-body{animation:none}
+.lite-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;background:var(--acc);color:var(--acc-ink);font-size:.7em;font-weight:700;letter-spacing:.04em;vertical-align:middle}

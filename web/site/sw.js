@@ -1,6 +1,10 @@
 // Offline support for the GitHub Pages build. Serves the cached app straight away and
 // refreshes the cache in the background, so a new version shows up on the next launch.
-const CACHE = 'bullpup-__VERSION__';
+// The full app lives at the site root and Lite at lite/, on the same origin. Each keeps its
+// own cache, and the root worker leaves everything under lite/ to Lite's own worker.
+const LITE = __LITE__;
+const CACHE = (LITE ? 'bullpup-lite-' : 'bullpup-') + '__VERSION__';
+const mine = k => LITE ? k.startsWith('bullpup-lite-') : k.startsWith('bullpup-') && !k.startsWith('bullpup-lite-');
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'pwa/icon-192.png', 'pwa/icon-512.png', 'pwa/icon-maskable-512.png', 'pwa/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -9,13 +13,15 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k.startsWith('bullpup-') && k !== CACHE).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => mine(k) && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== location.origin) return;
+  if (!LITE && url.href.startsWith(self.registration.scope + 'lite/')) return;
   const key = req.mode === 'navigate' ? 'index.html' : req;
   e.respondWith(caches.open(CACHE).then(async c => {
     const hit = await c.match(key, { ignoreSearch: true });
