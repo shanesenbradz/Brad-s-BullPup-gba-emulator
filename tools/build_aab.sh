@@ -8,7 +8,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 TC=.toolchain; B=build-aab
-PKG=${PKG:-com.bradz.bullpup}; VC=${VC:-8}; VN=${VN:-1.7}; TARGET=${TARGET:-36}
+PKG=${PKG:-com.bradz.bullpup}; VC=${VC:-10}; VN=${VN:-1.9}; TARGET=${TARGET:-36}
 T=$TC/minapk/package/tools; AJ=$T/android.jar
 [ -d $TC/minapk ] || { echo "Run tools/build_apk.sh first to fetch the toolchain"; exit 1; }
 case "$(uname -s)" in Darwin) AAPT2=$TC/aapt/package/bin/x64/darwin/aapt2;; *) AAPT2=$TC/aapt/package/bin/x64/linux/aapt2;; esac
@@ -19,8 +19,10 @@ VN=$VN python3 tools/bundle.py >/dev/null
 rm -rf $B; mkdir -p $B/assets $B/classes $B/dex $B/base
 cp dist/Brads_Bullpup.html $B/assets/index.html
 "$AAPT2" compile --dir android/res -o $B/res.zip
+# Play installs its own updates and doesn't allow REQUEST_INSTALL_PACKAGES, so the in-app updater's permission comes out
+grep -v 'REQUEST_INSTALL_PACKAGES' android/AndroidManifest.xml > $B/AndroidManifest.xml
 # --proto-format is what bundletool expects; the Java package stays com.bradz.calzone, only the app id changes
-"$AAPT2" link --proto-format -I $AJ --manifest android/AndroidManifest.xml -o $B/linked.zip -A $B/assets \
+"$AAPT2" link --proto-format -I $AJ --manifest $B/AndroidManifest.xml -o $B/linked.zip -A $B/assets \
   --min-sdk-version 24 --target-sdk-version $TARGET --version-code $VC --version-name $VN \
   --rename-manifest-package $PKG --java $B/gen $B/res.zip
 java -jar $T/ecj-3.45.0.jar -8 -nowarn -cp $AJ -d $B/classes $(find android/src $B/gen -name '*.java')

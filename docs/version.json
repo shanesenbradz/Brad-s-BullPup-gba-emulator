@@ -1,0 +1,28 @@
+{
+  "full": {
+    "version": "1.9",
+    "code": 10,
+    "apk": "https://raw.githubusercontent.com/shanesenbradz/Brad-s-BullPup-gba-emulator/main/release/Brads_Bullpup_1.9.apk",
+    "page": "https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/download/",
+    "size": 480561,
+    "sha256": "adfedd314ee2b17a44ba7ff50b29114b4e388398d4cfc69e369c62b3f0f55da7",
+    "notes": [
+      "Search box at the top of the menu: type a word like rewind, vibration or bluetooth and every matching setting from every tab shows up, ready to change",
+      "In-place updates: System, Updates checks GitHub for a newer version and installs it over this one, keeping your games, saves and settings",
+      "APK download page on the website that downloads straight to the phone"
+    ]
+  },
+  "lite": {
+    "version": "1.1",
+    "code": 2,
+    "apk": "https://raw.githubusercontent.com/shanesenbradz/Brad-s-BullPup-gba-emulator/main/release/Brads_Bullpup_Lite_1.1.apk",
+    "page": "https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/download/",
+    "size": 484657,
+    "sha256": "46cd27fe4a76c933fb9871e9155d0e9c704687ad5eeb674ed5bc926f26b319a7",
+    "notes": [
+      "Search box at the top of the menu: type a word like rewind, vibration or bluetooth and every matching setting from every tab shows up, ready to change",
+      "In-place updates: System, Updates checks GitHub for a newer version and installs it over this one, keeping your games, saves and settings",
+      "APK download page on the website that downloads straight to the phone"
+    ]
+  }
+}

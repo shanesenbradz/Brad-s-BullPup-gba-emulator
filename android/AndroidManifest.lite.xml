@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.bradz.calzone.lite">
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- in-place updates: download the new APK and hand it to Android's installer -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
     <application android:label="Bullpup Lite" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"

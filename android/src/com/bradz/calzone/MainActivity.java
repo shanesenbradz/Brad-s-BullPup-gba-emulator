@@ -50,6 +50,7 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileCallback;
     private int padKeys, padAxes, padSent = -1;
     private LinkManager link;
+    private Updater updater;
     private float padX, padY, padSentX = 9, padSentY = 9;
 
     @Override
@@ -96,6 +97,8 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(this), "CalzoneAndroid");
         link = new LinkManager(this);
         web.addJavascriptInterface(link, "BullpupLink");
+        updater = new Updater(this);
+        web.addJavascriptInterface(updater, "BullpupUpdate");
 
         InputManager im = (InputManager) getSystemService(Context.INPUT_SERVICE);
         if (im != null) im.registerInputDeviceListener(new InputManager.InputDeviceListener() {
@@ -309,6 +312,12 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> js(code));
     }
 
+    /* ---------- in-place updates (Updater) ---------- */
+    void updateEvent(String type, String data) {
+        String code = "window.bullpupUpdate&&bullpupUpdate(" + jsStr(type) + "," + jsStr(data) + ")";
+        runOnUiThread(() -> js(code));
+    }
+
     void linkMessage(String line) {
         String code = "window.bullpupLinkMsg&&bullpupLinkMsg(" + jsStr(line) + ")";
         runOnUiThread(() -> js(code));
@@ -387,6 +396,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (link != null) link.close("exit");
+        if (updater != null) updater.close();
         if (web != null) { web.destroy(); web = null; }
         super.onDestroy();
     }

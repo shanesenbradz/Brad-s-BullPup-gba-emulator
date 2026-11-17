@@ -27,7 +27,7 @@ const DEFAULTS = {
   click: 'off', clickVol: 1, haptic: 'light', ambient: 'subtle', bezel: false, glass: false, led: true,
   shell: true, gloss: 'satin', grille: true, decal: 'none', wall: false, wallDim: 0.1, wallBlur: 0, vinyl: 'soft', saveLights: true,
   // system
-  autoResume: true, autoSaveSec: 30, pauseOnMenu: true, pauseHidden: true, skipBios: true, idle: 'remove', opposing: false, wakeLock: true, slot: 1,
+  autoResume: true, autoUpdate: true, autoSaveSec: 30, pauseOnMenu: true, pauseHidden: true, skipBios: true, idle: 'remove', opposing: false, wakeLock: true, slot: 1,
   // performance: 'auto' or how many frames to skip drawing between drawn ones
   frameskip: 0,
 };

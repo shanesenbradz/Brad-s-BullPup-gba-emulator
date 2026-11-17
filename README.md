@@ -13,15 +13,17 @@ No games are included. Load ROMs you dumped from cartridges you own.
 
 ## Install
 
-Download [Brads_Bullpup_1.8.apk](release/Brads_Bullpup_1.8.apk?raw=1) on your phone, open it and allow installs from your browser or file manager if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
+On your phone, open the **[download page](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/download/)** and tap Download APK. Open the file and allow installs from your browser if Android asks. Play Protect may warn about an unknown developer, since it isn't from the Play Store. Tap "Install anyway".
 
-You can also skip the install and [run it in the browser](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/). It works offline after the first visit, and Chrome's "Add to Home screen" or "Install app" turns it into a full-screen app. [Brads_Bullpup_1.8.html](release/Brads_Bullpup_1.8.html?raw=1) is the same thing as one file you can keep on a phone or PC.
+Direct links, if you'd rather skip the page: [Brads_Bullpup_1.9.apk](https://raw.githubusercontent.com/shanesenbradz/Brad-s-BullPup-gba-emulator/main/release/Brads_Bullpup_1.9.apk) and [Brads_Bullpup_Lite_1.1.apk](https://raw.githubusercontent.com/shanesenbradz/Brad-s-BullPup-gba-emulator/main/release/Brads_Bullpup_Lite_1.1.apk). Don't tap the .apk files in GitHub's file list on a phone: GitHub shows them as text instead of downloading them.
 
-It runs on Android 7 and up.
+You can also skip the install and [run it in the browser](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/). It works offline after the first visit, and Chrome's "Add to Home screen" or "Install app" turns it into a full-screen app. Brads_Bullpup_1.9.html in release/ is the same thing as one file you can keep on a phone or PC.
+
+It runs on Android 7 and up. From 1.9 on, the app updates itself: System, Updates.
 
 ### Brad's Bullpup Lite, for older phones
 
-If games stutter or the sound crackles on an older or cheaper phone, try [Brads_Bullpup_Lite_1.0.apk](release/Brads_Bullpup_Lite_1.0.apk?raw=1), or [the Lite web version](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/lite/). It's a separate app (Bullpup Lite, with a green LITE tag on the icon), so it installs next to the full one. Moving your games over takes one backup: export it in the full app under System, import it in Lite.
+If games stutter or the sound crackles on an older or cheaper phone, get Lite from the [download page](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/download/), or [the Lite web version](https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/lite/). It's a separate app (Bullpup Lite, with a green LITE tag on the icon), so it installs next to the full one. Moving your games over takes one backup: export it in the full app under System, import it in Lite.
 
 Lite runs the same mGBA core and keeps cheats, save states, controllers, the touch layout editor, fast forward and .sav import and export. What changes:
 
@@ -34,6 +36,14 @@ Lite runs the same mGBA core and keeps cheats, save states, controllers, the tou
 - On 90 and 120 Hz screens it asks Android for 60 Hz, since GBA games run at 60 fps anyway.
 
 **Coming from 1.7 or older:** 1.8 is signed with a new long-term release key (the old one was lost), so Android won't install it over an earlier version. In your current version go to System and export a backup, uninstall it, install 1.8 and import the backup. Lite 1.0 uses the same key. Every version from 1.8 on updates in place, keeping your games, saves and states.
+
+## What's new in 1.9 (Lite 1.1)
+
+- Search in the menu. Type a word like "rewind", "vibration", "bluetooth" or "volume" in the box at the top and every matching setting from every tab shows up in one list, ready to change right there. Related words work too, so "volume" finds Output and "trade" finds the link cable. Each tab's results have a button to jump to that tab, and the back gesture clears the search first.
+- In-place updates. System has a new Updates section: Check for updates looks at this repo's docs/version.json, shows what's new, downloads the APK, checks its SHA-256 and hands it to Android's installer as an update of the same app. Android asks you to confirm, and because every build since 1.8 is signed with the same key it installs over the old one with your games, saves, states and settings intact. The first time, Android asks you to allow Bullpup to install apps. It also checks on launch (at most twice a day) and asks before doing anything; turn that off in the same section. The web app refreshes its offline copy and reloads instead, and the Google Play build leaves updates to Play.
+- A download page on the website, so the APK downloads straight to the phone. GitHub's own file view showed the APK as a page of garbled text on phones.
+- The web app's offline worker now only caches the app itself, so links to APKs and other pages on the site always load from the network, and updates skip the browser's HTTP cache.
+- Lite can now check for and install updates too (it gained the internet permission for that).
 
 ## What's new in 1.8
 
@@ -89,7 +99,7 @@ web/brand/    the pixel bullpup and sprite sheet, plus the Python that draws the
 vendor/mgba/  mgba.js and mgba.wasm, plus src/ with the wrapper and link driver they're built from (see SOURCE.md)
 android/      manifest, icons and MainActivity.java for the WebView shell (res-lite/ and AndroidManifest.lite.xml for Lite)
 web/lite/     Lite's extra stylesheet and icon
-tools/        bundle.py and build_apk.sh
+tools/        bundle.py, build_apk.sh and publish.py
 test/         a homebrew test ROM, its C source, and a Playwright end-to-end test
 dist/         the bundled single-file app
 docs/         the GitHub Pages site: the app, web manifest, service worker and privacy policy
@@ -120,7 +130,10 @@ python3 tools/lite_icons.py      # Lite's launcher icons with the LITE tag
 ./tools/build_aab.sh             # dist/ -> dist/Brads_Bullpup_play.aab (Google Play, com.bradz.bullpup)
 python3 tools/store_assets.py    # web app icons and Play listing art
 ./tools/build_core.sh            # rebuilds vendor/mgba from source (needs Emscripten)
+python3 tools/publish.py "note" "note"   # after both APK builds: release/ copies, the download page and docs/version.json
 ```
+
+To ship an update, bump VC and VN in tools/build_apk.sh (and the default in tools/bundle.py), build both APKs with the release key, run publish.py with the release notes and push. Installed apps see the new docs/version.json and offer the update.
 
 The APK build doesn't need Android Studio. It downloads aapt2, android.jar, d8, ecj and apksigner from two npm packages into .toolchain/ and needs Java 17 or newer, Node and Python 3. I compile with ecj instead of javac because d8 8.2 rejects the MethodParameters attribute that newer javac versions write into inner classes.
 

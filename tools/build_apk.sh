@@ -8,8 +8,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 TC=.toolchain; B=build
 LITE=${LITE:-0}
-if [ "$LITE" = 1 ]; then VC=${VC:-1}; VN=${VN:-1.0}; NAME=Brads_Bullpup_Lite; MANIFEST=android/AndroidManifest.lite.xml
-else VC=${VC:-9}; VN=${VN:-1.8}; NAME=Brads_Bullpup; MANIFEST=android/AndroidManifest.xml; fi
+if [ "$LITE" = 1 ]; then VC=${VC:-2}; VN=${VN:-1.1}; NAME=Brads_Bullpup_Lite; MANIFEST=android/AndroidManifest.lite.xml
+else VC=${VC:-10}; VN=${VN:-1.9}; NAME=Brads_Bullpup; MANIFEST=android/AndroidManifest.xml; fi
 TARGET=${TARGET:-36}
 if [ ! -d $TC/minapk ]; then
   mkdir -p $TC && (cd $TC && npm pack @drxiaozhi/minapk@0.5.1 aaptjs3@2.0.2 >/dev/null)

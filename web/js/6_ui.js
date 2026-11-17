@@ -43,7 +43,7 @@ addEventListener('popstate', () => {
 window.bullpupBack = () => {
   if (!$('#dlgWrap').classList.contains('hidden')) { $('#dlgWrap').click(); return true; }
   if (Touch.editing) { Touch.endEdit(); return true; }
-  if (!$('#sheet').classList.contains('hidden')) { Sheet.close(); return true; }
+  if (!$('#sheet').classList.contains('hidden')) { if (Sheet.query) { Sheet.setQuery(''); Sheet.render(); } else Sheet.close(); return true; }
   if (Emu.active) { Emu.stop(); return true; }
   return false;
 };
@@ -199,7 +199,12 @@ const redraw = () => { if (Emu.active) { Emu.layoutScreen(); } };
 const Sheet = {
   tab: 'game',
   tabs() { return Emu.active ? [['game', 'Game'], ['cheats', 'Cheats'], ['look', 'Look'], ['audio', 'Audio'], ['controls', 'Input'], ['system', 'System']] : [['look', 'Look'], ['audio', 'Audio'], ['controls', 'Input'], ['system', 'System']]; },
-  init() { $('#sheetClose').onclick = () => this.close(); $('#scrim').onclick = () => this.close(); },
+  init() {
+    $('#sheetClose').onclick = () => this.close(); $('#scrim').onclick = () => this.close();
+    const q = $('#menuSearch'); let t = 0;
+    q.oninput = () => { clearTimeout(t); t = setTimeout(() => { const was = !!this.query.trim(); this.query = q.value; if (!was || !this.query.trim()) $('#sheetBody').scrollTop = 0; this.render(); }, 120); };
+    q.onkeydown = e => { if (e.key === 'Escape') { e.stopPropagation(); this.setQuery(''); this.render(); q.blur(); } if (e.key === 'Enter') q.blur(); };
+  },
   get isOpen() { return !$('#sheet').classList.contains('hidden'); },
   toggle() { this.isOpen ? this.close() : this.open(); },
   open(tab) {
@@ -211,19 +216,120 @@ const Sheet = {
     this.render();
   },
   close() {
+    this.setQuery('');
     $('#sheet').classList.add('hidden'); $('#scrim').classList.add('hidden');
     if (Emu.active && this._paused && !Emu.userPaused) Emu.pause(false); this._paused = false;
     if (!Emu.active) Library.render();
   },
-  refreshIf(t) { if (this.isOpen && this.tab === t) this.render(); },
+  refreshIf(t) { if (this.isOpen && (this.tab === t || this.query)) this.render(); },
+  query: '',
+  setQuery(q) { this.query = q; const i = $('#menuSearch'); if (i && i.value !== q) i.value = q; },
   render() {
     const nav = $('#tabs'); nav.innerHTML = '';
-    for (const [k, l] of this.tabs()) nav.append(h('button', { class: k === this.tab ? 'act' : '', onclick: () => { this.tab = k; this.render(); } }, l));
+    for (const [k, l] of this.tabs()) nav.append(h('button', { class: k === this.tab && !this.query.trim() ? 'act' : '', onclick: () => { this.setQuery(''); this.tab = k; $('#sheetBody').scrollTop = 0; this.render(); } }, l));
+    if (this.query.trim()) return this.renderSearch(this.query);
     const b = $('#sheetBody'); const top = b.scrollTop; b.innerHTML = '';
     const bar = foldBar(b); b.append(bar);
     Promise.resolve(Panels[this.tab](b)).then(() => { bar._label(); b.scrollTop = top; });
     bar._label(); b.scrollTop = top;
   },
+};
+
+/* ---------- menu search ----------
+ * Typing in the search box renders every tab of the menu at once and keeps only the settings that
+ * match, so "rewind", "vibration" or "bluetooth" finds the switch wherever it lives. Matching
+ * sections open (without changing which sections you keep open), everything else is hidden, and the
+ * controls work right there in the results. Each tab's results have a button to jump to that tab. */
+const normQ = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9.+#]+/g, ' ').trim();
+// Extra words people search for that don't appear in a section's own text
+const SEARCH_TAGS = {
+  'Speed': 'fast forward turbo slow motion pause',
+  'Save states': 'load slot snapshot quick save',
+  'Battery save': 'sav in game save export import pizza boy my boy',
+  'Tools': 'screenshot record clip video capture photo',
+  'Link cable': 'trade battle multiplayer wifi bluetooth pokemon cable club two phones',
+  'Active cheats': 'gameshark codebreaker action replay code',
+  'RAM search': 'cheat finder memory value lock',
+  'Screen shader': 'filter lcd crt scanlines grid graphics video look',
+  'Screen picture': 'brightness contrast saturation color correction blend aspect integer scaling video',
+  'Output': 'volume sound audio mute',
+  'Reverb': 'room echo sound audio',
+  'Equalizer': 'eq bass mid treble width stereo speaker',
+  'Touch controls': 'buttons layout opacity size edit dpad on screen',
+  'Controllers': 'gamepad bluetooth xbox playstation ps4 ps5 8bitdo switch pro pair',
+  'Gamepad buttons': 'remap bind controller mapping',
+  'Keyboard': 'keys remap bind mapping',
+  'Performance': 'frame skip fps lag stutter slow speed',
+  'Behaviour': 'auto resume snapshot pause background screen on wake lock lights',
+  'Rewind': 'undo go back memory',
+  'Core': 'bios idle loop accuracy mgba',
+  'Backup': 'export import restore transfer move phone saves',
+  'Updates': 'update upgrade new version download install check',
+  'About': 'version privacy license credits',
+  'Appearance': 'theme dark light accent color colour',
+  'Controller skin': 'skin shell color colour console',
+  'Device': 'bezel glass led grille plate',
+  'Wallpaper': 'background image photo',
+  'Buttons': 'button style press haptic vibration click sound labels',
+  'Effects': 'ambient glow vinyl wrap sticker decal shadow',
+  'Controller': 'skin buttons haptic vibration labels',
+  'Screen': 'shader filter video picture',
+};
+function filterPanel(part, words, tabLabel) {
+  let hits = 0;
+  const has = (txt, w) => txt.includes(w);
+  // text of an element, ignoring the options inside drop-down lists
+  const text = el => { const c = el.cloneNode(true); c.querySelectorAll('select,option,canvas,svg').forEach(x => x.remove()); return normQ(c.textContent); };
+  for (const box of part.querySelectorAll('.sec')) {
+    const headEl = box.querySelector(':scope>.sec-h');
+    const title = headEl ? headEl.textContent : '';
+    const base = String(title).split('  ·  ')[0];
+    const ctx = normQ(tabLabel + ' ' + title + ' ' + (SEARCH_TAGS[base] || ''));
+    const body = box.querySelector(':scope>.sec-body') || box;
+    // a list of rows inside one wrapper (the key and button bindings) is searched row by row
+    const split = c => !c.classList.contains('row') && c.querySelectorAll(':scope>.row').length > 1 ? [...c.children] : [c];
+    const items = [...body.children].flatMap(c => c.classList.contains('group') ? [...c.children] : [c]).flatMap(split);
+    const titleCtx = normQ(tabLabel + ' ' + title);
+    let show = 0;
+    if (title && words.every(w => has(titleCtx, w))) show = items.length || 1; // the section's own name matches: show all of it
+    else {
+      for (const it of items) {
+        const t = text(it);
+        const ok = t && words.every(w => has(t, w) || has(ctx, w)) && words.some(w => has(t, w));
+        it.style.display = ok ? '' : 'none';
+        if (ok) show++;
+      }
+      // only a related word matched (say "volume" for Output): show the whole section
+      if (!show && title && words.every(w => has(ctx, w))) { items.forEach(it => { it.style.display = ''; }); show = items.length || 1; }
+    }
+    for (const w of body.querySelectorAll('.group>div:not(.row), :scope>.group')) if (w.children.length && ![...w.children].some(c => c.style.display !== 'none')) w.style.display = 'none';
+    if (!show) { box.style.display = 'none'; continue; }
+    hits += show;
+    box.classList.remove('closed'); headEl?.setAttribute('aria-expanded', 'true');
+    if (box.querySelector('.pv') && typeof refreshPreviewVinyl === 'function') requestAnimationFrame(() => refreshPreviewVinyl(_pv));
+  }
+  part.querySelectorAll('.fold-bar').forEach(x => x.remove());
+  return hits;
+}
+Sheet.renderSearch = async function (q) {
+  const gen = (this._gen = (this._gen || 0) + 1);
+  const words = normQ(q).split(' ').filter(Boolean);
+  const b = $('#sheetBody'), top = b.scrollTop, keep = this.tab, out = document.createDocumentFragment();
+  let hits = 0;
+  for (const [k, l] of this.tabs()) {
+    const part = h('div', { class: 'search-part' });
+    this.tab = k;
+    try { await Panels[k](part); } catch (e) { console.warn('search', k, e); }
+    this.tab = keep;
+    if (gen !== this._gen) return; // a newer search started while this tab was rendering
+    const n = words.length ? filterPanel(part, words, l) : 0;
+    if (!n) continue;
+    hits += n;
+    out.append(h('div', { class: 'search-tab' }, h('span', null, l),
+      h('button', { class: 'fold-all', type: 'button', onclick: () => { this.setQuery(''); this.tab = k; b.scrollTop = 0; this.render(); } }, 'Open ' + l + ' tab')), part);
+  }
+  if (!hits) out.append(h('div', { class: 'search-none' }, h('b', null, 'No settings match "' + q.trim() + '"'), h('div', null, 'Try a shorter word, like "sound", "skin" or "save".')));
+  b.innerHTML = ''; b.append(out); b.scrollTop = top;
 };
 
 /* ---------- link cable section of the game menu ---------- */
@@ -529,6 +635,7 @@ const Panels = {
         h('button', { class: 'btn primary', onclick: () => exportBackup(inc.checked) }, 'Export backup'),
         h('button', { class: 'btn', onclick: importBackup }, 'Import backup')),
     ));
+    b.append(updatesSection());
     b.append(sec('About', h('div', { class: 'note', html: `<b>Brad's Bullpup${LITE ? ' Lite' : ''}</b> ${APP_VERSION}.${LITE ? ' The light edition for older phones: same mGBA core and saves, fewer extras.' : ''} Game Boy Advance, Game Boy and Game Boy Color emulation by <b>mGBA</b> (Jeffrey Pfau and contributors, MPL 2.0), compiled to WebAssembly by the wasm-gaming mGBA-wasm project (MPL 2.0). Source for both is public on GitHub. Cheat code formats follow VBA-M's documentation. No games are included. Only play ROMs you dumped from cartridges you own. Nothing is collected or sent anywhere: your games, saves and settings stay on this device. <a href="https://shanesenbradz.github.io/Brad-s-BullPup-gba-emulator/privacy.html" target="_blank" rel="noopener">Privacy policy</a>` })));
   },
 };
@@ -686,6 +793,7 @@ function initEditBar() {
     Input.init(); Touch.init(); Sheet.init(); initEditBar(); Library.init();
     $('#boot').remove();
     window.__calzone = { core, Emu, S, DB, Audio_, Input };
+    setTimeout(() => Updater.auto(), 5000);
   } catch (e) {
     console.error(e);
     $('.boot-msg').textContent = 'Could not start: ' + (e.message || e);

@@ -4,7 +4,7 @@ LITE=1 builds Brad's Bullpup Lite instead (dist/Brads_Bullpup_Lite.html, docs/li
 import base64, glob, os, pathlib, shutil
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LITE = os.environ.get('LITE') == '1'
-VERSION = os.environ.get('VN', '1.0' if LITE else '1.8')
+VERSION = os.environ.get('VN', '1.1' if LITE else '1.9')
 W = ROOT / 'web'
 shell = (W / 'shell.html').read_text()
 css = (W / 'app.css').read_text() + ('\n' + (W / 'lite/lite.css').read_text() if LITE else '')
